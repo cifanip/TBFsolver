@@ -1,2 +1,2 @@
 # TBFsol
-DNS turbulent bubbly flow solver
+DNS Turbulent Bubbly Flow solver
