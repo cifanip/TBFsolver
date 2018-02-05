@@ -10,4 +10,4 @@ TBFsol is distributed under the terms of the General Public License. See the fil
 See the file 'INSTALL' for instructions.
 
 ## USAGE
-An example of a test-case of a minimum turbulent channle flow, loaded with 18 deformable bubbles, is given in folder 'case_18'. Please refer to the [user guide](user_guide/user_guide.pdf) for details about the input parameters. 
+An example of a test-case of a minimum turbulent channle flow, loaded with 18 deformable bubbles, is given in folder 'case_18'. Please refer to the [user guide](user_guide/user_guide.pdf) for an illustration of the input parameters. 
