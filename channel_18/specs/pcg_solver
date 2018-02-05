@@ -1,0 +1,13 @@
+!*************  multigrid
+nLevels 5
+nPreSweep 2
+nPostSweep 4
+
+tolMG 4.d-1
+maxIterMG 100
+fullInfoMG .F.
+
+!*************  pcg
+tolPCG 1.d-10
+maxIterPCG 100
+fullInfoPCG .F.

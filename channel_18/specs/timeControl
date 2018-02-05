@@ -1,0 +1,18 @@
+Tf 100.d0
+dt 1.d-3
+writeInterval -1
+dtout 10.d0
+input_folder 0
+
+adaptiveTimeStep .T.
+cflMax 0.1d0
+
+!stats average
+Ts 0.d0
+
+!ramp up props
+Tr 4.d0
+isRampUp .T.
+
+!vof blocks redistribution
+vofBlocksRedInterval 1.d-1

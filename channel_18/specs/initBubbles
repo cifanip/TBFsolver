@@ -1,0 +1,8 @@
+method 2
+nbx 6
+nby 1
+nbz 3
+R 0.125d0
+nref 50
+
+random_distr .FALSE.

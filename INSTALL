@@ -1,0 +1,32 @@
+------------------------------------
+How to compile the solver:
+
+- go to directory TBFsol
+- type `make'
+
+------------------------------------
+Dependencies: 
+
+The Makefile is set to compile the source codes on the Dutch supercomputer 
+Cartesius (see https://userinfo.surfsara.nl/systems/cartesius). You should be able 
+to compile the solver correctly without modifying the original Makefile. 
+If you want to compile the solver on a different machine you need to manually 
+set the dependencies for the following libraries: 
+
+- LAPACK
+- FFTW3 (multi-threaded version)
+- MUMPS (parallel MPI version)
+
+Please refer to the websites of these libraries to download and link the relevant 
+files. 
+
+------------------------------------
+Compiler flags:
+
+- POIS_OPT: set to FAST_MODE to compile the fast-Poisson solver; 
+            set to MG_MODE to compile the multi-grid Poisson solver.
+		    
+- COMPILER: set to ifort by default. Tested on gfortran as well. 
+
+The optimisation flag is set to -O2 by default. Uncomment debug or extended 
+debug flags to activate the debugging mode while coding.  

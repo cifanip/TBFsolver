@@ -1,0 +1,7 @@
+px 4
+py 1
+pz 2
+
+wrap_x .true.
+wrap_y .false.
+wrap_z .true.
