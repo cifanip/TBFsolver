@@ -6,7 +6,7 @@ TBFsol is an highly accurate and parallelised solver for the direct numerical si
 ## COPYING
 TBFsol is distributed under the terms of the General Public License. See the file COPYING for details. 
 
-## INSTSALLATION
+## INSTALLATION
 See the file 'INSTALL' for instructions.
 
 ## USAGE
