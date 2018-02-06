@@ -1,10 +1,10 @@
-# TBFsol
-DNS Turbulent Bubbly Flow solver
+# TBFsim
+DNS Turbulent Bubbly Flow simulator
 
-TBFsol is an highly accurate and parallelised solver for the direct numerical simulation (DNS) of turbulent bubble-laden channel flow. See [P. Cifani - DNS of turbulent bubble-laden channel flows](https://research.utwente.nl/en/publications/dns-of-turbulent-bubble-laden-channel-flows) for more details. 
+TBFsim is an highly accurate and parallelised solver for the direct numerical simulation (DNS) of turbulent bubble-laden channel flow. See [P. Cifani - DNS of turbulent bubble-laden channel flows](https://research.utwente.nl/en/publications/dns-of-turbulent-bubble-laden-channel-flows) for more details. 
 
 ## COPYING
-TBFsol is distributed under the terms of the General Public License. See the file COPYING for details. 
+TBFsim is distributed under the terms of the General Public License. See the file COPYING for details. 
 
 ## INSTALLATION
 See the file 'INSTALL' for instructions.
