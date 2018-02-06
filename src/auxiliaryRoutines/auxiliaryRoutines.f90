@@ -1,5 +1,5 @@
 ! ************************************************************************************** !
-!    TBFsim - DNS turbulent bubbly flow simulator
+!    TBFsolver - DNS turbulent bubbly flow solver
 !    Copyright (C) 2018  University of Twente.
 !
 !    This program is free software: you can redistribute it and/or modify
