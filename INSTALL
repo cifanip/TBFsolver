@@ -26,7 +26,7 @@ Compiler flags:
 - POIS_OPT: set to FAST_MODE to compile the fast-Poisson solver; 
             set to MG_MODE to compile the multi-grid Poisson solver.
 		    
-- COMPILER: set to ifort by default. Tested on gfortran as well. 
+- COMPILER: set to ifort by default. GNU fortran compilers may require small modifications. 
 
 The optimisation flag is set to -O2 by default. Uncomment debug or extended 
 debug flags to activate the debugging mode while coding.  
