@@ -116,7 +116,7 @@ PROGRAM main
 					         alphaRKS(runTime))
 
 			!print out continuity error
-    		call computeContinuityError(u,runTime%dt_)
+    			call computeContinuityError(u,runTime%dt_)
 			
 			!correct pressure
 !DIR$ IF DEFINED (FAST_MODE)
