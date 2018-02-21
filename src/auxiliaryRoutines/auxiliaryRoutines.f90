@@ -437,7 +437,7 @@ contains
     	call updateBoundariesV(u)
 
     	if (IS_MASTER) then
-    		write(*,'(A,'//s_outputFormat(2:9)//')') '	Press grad set to: ', uf/(alpha*dt)
+    		!write(*,'(A,'//s_outputFormat(2:9)//')') '	Press grad set to: ', uf/(alpha*dt)
     	end if
     
     end subroutine
