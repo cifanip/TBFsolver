@@ -96,6 +96,7 @@ module gridMod
 		
 		!cell volume
 		real(DP), allocatable, dimension(:,:,:) :: V_
+		real(DP), allocatable, dimension(:,:,:) :: Vsx_
 		
 		contains
 		
@@ -160,13 +161,13 @@ contains
 		
 		this%ptrMPIC_ => mpiCTRL
 			
-		call readParameter(this%dict_,this%Lx_,'Lx')
-		call readParameter(this%dict_,this%Ly_,'Ly')
-		call readParameter(this%dict_,this%Lz_,'Lz')
+		call readParameter(this%dict_,this%Lx_,'Lx',bcast=.FALSE.)
+		call readParameter(this%dict_,this%Ly_,'Ly',bcast=.FALSE.)
+		call readParameter(this%dict_,this%Lz_,'Lz',bcast=.FALSE.)
 		
-		call readParameter(this%dict_,this%nx_,'nx')
-		call readParameter(this%dict_,this%ny_,'ny')
-		call readParameter(this%dict_,this%nz_,'nz')
+		call readParameter(this%dict_,this%nx_,'nx',bcast=.FALSE.)
+		call readParameter(this%dict_,this%ny_,'ny',bcast=.FALSE.)
+		call readParameter(this%dict_,this%nz_,'nz',bcast=.FALSE.)
 		
 		!grid halo dim
 		this%hd_=3
@@ -189,9 +190,9 @@ contains
 		this%k1g_ = this%nz_
 
 	
-		call readParameter(this%dict_,this%isDirUnif_(1),'isXunif')
-		call readParameter(this%dict_,this%isDirUnif_(2),'isYunif')
-		call readParameter(this%dict_,this%isDirUnif_(3),'isZunif')
+		call readParameter(this%dict_,this%isDirUnif_(1),'isXunif',bcast=.FALSE.)
+		call readParameter(this%dict_,this%isDirUnif_(2),'isYunif',bcast=.FALSE.)
+		call readParameter(this%dict_,this%isDirUnif_(3),'isZunif',bcast=.FALSE.)
 !DIR$ IF DEFINED (FAST_MODE)
 		call checkGridSpacing(this)
 !DIR$ ENDIF
@@ -471,6 +472,7 @@ contains
 		
 		!compute volume
 		call computeVolume(gLoc)
+		call computeVolume_sx(gLoc)
 		
 		!broadcast total volume
 		call MPI_BCAST(s_Vg, 1, MPI_DOUBLE_PRECISION, 0, mpiCTRL%cartComm_, ierror)
@@ -797,6 +799,40 @@ contains
 			do j=1-gHD,ny+gHD
 				do i=1-gHD,nx+gHD
 					this%V_(i,j,k) = this%dxf_(i)*this%dyf_(j)*this%dzf_(k)
+				end do
+			end do
+		end do
+		
+        
+	end subroutine
+!========================================================================================!
+
+!========================================================================================!
+	subroutine computeVolume_sx(this) 
+		type(grid), intent(inout) :: this 
+		real(DP) :: dx,dy,dz,dV
+		integer :: nx, ny, nz
+		integer :: i, j, k
+		
+		!stagg-x volume (no halo)
+		
+		nx = this%nx_
+		ny = this%ny_
+		nz = this%nz_
+		
+		call allocateArray(this%Vsx_,0,nx,1,ny,1,nz)
+
+		do k=1,nz
+			do j=1,ny
+				do i=0,nx
+				
+        			dx=this%dxc_(i+1)
+        			dy=this%dyf_(j)
+        			dz=this%dzf_(k)
+        			dV=dx*dy*dz	 
+        			
+        			this%Vsx_(i,j,k)=dV	
+        			
 				end do
 			end do
 		end do
