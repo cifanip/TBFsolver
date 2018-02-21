@@ -26,9 +26,11 @@ module auxiliaryRoutinesMod
 	public :: computeCFLmax
 	public :: updateShearFlow
 	public :: shapeError
-	public :: setCHf
+	public :: setPressGrad
 	public :: scaleVelocity
 	public :: computeVorticity	
+	public :: setFlowRate
+	public :: computeFlowRate
 	
 contains
 
@@ -235,16 +237,16 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-    subroutine setCHf(f,g,rhog,rhol,mul,c)
-		real(DP), intent(inout) :: f
-		real(DP), intent(in) :: g,rhog,rhol,mul
-		type(scalarField), intent(in) :: c
-		type(grid), pointer :: mesh
+    subroutine setPressGrad(f_ctrl,c,rho,rhog,rhol,mul,g,f)
+    	integer, intent(in) :: f_ctrl
+    	type(scalarField), intent(in) :: c,rho
+    	real(DP), intent(in) :: rhog,rhol,mul,g
+    	real(DP), intent(inout) :: f
+    	type(grid), pointer :: mesh
 		type(mpiControl), pointer :: mpic
-		real(DP) :: Vt_loc,Vg_loc,Vt,Vg,Vl
-		real(DP) :: Ret,Re,tauw,rhoAv,nul
-		integer :: nx,ny,nz,i,j,k
-		integer :: ierror
+		real(DP) :: Vt_loc,Vg_loc,Vt,Vg,Vl,rhoAv,Ret,nul,Re,tauw,x,irho,irho_g
+		integer :: nx,ny,nz,i,j,k,ierror
+		
 		
         mesh => c%ptrMesh_
         mpic => mesh%ptrMPIC_
@@ -253,37 +255,72 @@ contains
 		ny = mesh%ny_
 		nz = mesh%nz_
 		
-		!total volume
-		call reduceSum_omp(mesh%V_,1,nx,1,ny,1,nz,Vt_loc)
-		!gas volume
-		Vg_loc = 0.d0
-		!$OMP PARALLEL DO DEFAULT(none) &
-		!$OMP SHARED(c,mesh) &
-		!$OMP SHARED(nx,ny,nz) &
-		!$OMP PRIVATE(i,j,k) &
-		!$OMP REDUCTION(+:Vg_loc)
-		do k=1,nz
-			do j=1,ny
-				do i=1,nx
-					Vg_loc = Vg_loc + c%f_(i,j,k)*mesh%V_(i,j,k)
+		if (f_ctrl==1) then
+		
+			!total local volume
+			call reduceSum_omp(mesh%V_,1,nx,1,ny,1,nz,Vt_loc)
+			!gas volume
+			Vg_loc = 0.d0
+			!$OMP PARALLEL DO DEFAULT(none) &
+			!$OMP SHARED(c,mesh) &
+			!$OMP SHARED(nx,ny,nz) &
+			!$OMP PRIVATE(i,j,k) &
+			!$OMP REDUCTION(+:Vg_loc)
+			do k=1,nz
+				do j=1,ny
+					do i=1,nx
+						Vg_loc = Vg_loc + c%f_(i,j,k)*mesh%V_(i,j,k)
+					end do
 				end do
 			end do
-		end do
-		!$OMP END PARALLEL DO
+			!$OMP END PARALLEL DO
 		
-		call Mpi_Allreduce(Vt_loc, Vt, 1, MPI_DOUBLE_PRECISION, MPI_SUM, mpic%cartComm_, ierror)
-		call Mpi_Allreduce(Vg_loc, Vg, 1, MPI_DOUBLE_PRECISION, MPI_SUM, mpic%cartComm_, ierror)
+			call Mpi_Allreduce(Vt_loc, Vt, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+						       mpic%cartComm_, ierror)
+			call Mpi_Allreduce(Vg_loc, Vg, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+							   mpic%cartComm_, ierror)
 		
-		!liquid volume
-		Vl = Vt-Vg
-		rhoAv = (rhog*Vg+rhol*Vl)/Vt
+			!liquid volume
+			Vl = Vt-Vg
+			rhoAv = (rhog*Vg+rhol*Vl)/Vt
 		
-		Ret = 127.3d0
-		nul = mul/rhol
-		Re = 1.d0/nul
-		tauw = (Ret/Re)*(Ret/Re)
+			Ret = 127.3d0
+			nul = mul/rhol
+			Re = 1.d0/nul
+			tauw = (Ret/Re)*(Ret/Re)
 		
-		f = tauw - rhoAv*g
+			f = tauw - rhoAv*g
+		
+		elseif (f_ctrl==2) then
+		
+    		x=0.d0
+			!$OMP PARALLEL DO DEFAULT(none) &
+			!$OMP PRIVATE(i,j,k,x) &
+			!$OMP SHARED(mesh,rho,nx,ny,nz) &
+			!$OMP REDUCTION(+:irho)
+    		do k=1,nz
+    			do j=1,ny
+    				do i=0,nx-1			
+    				
+    					x = 0.5d0*(1.d0/rho%f_(i+1,j,k)+1.d0/rho%f_(i,j,k))
+    					irho = irho + x*mesh%Vsx_(i,j,k)
+    				
+    				end do
+    			end do
+    		end do
+    		!$OMP END PARALLEL DO
+    	
+    		call Mpi_Allreduce(irho, irho_g, 1, MPI_DOUBLE_PRECISION, MPI_SUM,  &
+    					   	   mpic%cartComm_, ierror)
+    	
+    		!gravity term				   
+    		f = -g*s_Vg/irho_g  
+    		
+		else
+		
+			f = 0.d0
+
+		end if
         
     end subroutine
 !========================================================================================!
@@ -355,6 +392,92 @@ contains
 		!$OMP END PARALLEL DO
 
         
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
+    subroutine setFlowRate(ctrl,u,rho,Q,dt,alpha)
+    	integer, intent(in) :: ctrl
+		type(vectorField), intent(inout) :: u
+		type(scalarField), intent(in) :: rho
+		real(DP), intent(in) :: Q,dt,alpha
+		type(grid), pointer :: mesh
+		type(mpiControl), pointer :: mpic
+		real(DP) :: x,irho,uf,Qs,irho_g,r
+		integer :: nx,ny,nz,i,j,k,ierror
+
+		if ((ctrl<2).OR.(ctrl>2)) then
+			return
+		end if
+
+        mesh => u%ptrMesh_
+        mpic => mesh%ptrMPIC_
+        
+        nx=mesh%nx_
+        ny=mesh%ny_
+        nz=mesh%nz_
+    
+    	call computeFlowRate(u,Qs)
+
+    	uf = (Q-Qs)/s_Vg
+    	
+		!$OMP PARALLEL DO DEFAULT(none) &
+		!$OMP PRIVATE(i,j,k) &
+		!$OMP SHARED(u,uf,nx,ny,nz)
+    	do k=1,nz
+    		do j=1,ny
+    			do i=0,nx		
+    				
+    				u%ux_%f_(i,j,k) = u%ux_%f_(i,j,k) + uf
+    				
+    			end do
+    		end do
+    	end do
+    	!$OMP END PARALLEL DO
+    	call updateBoundariesV(u)
+
+    	if (IS_MASTER) then
+    		write(*,'(A,'//s_outputFormat(2:9)//')') '	Press grad set to: ', uf/(alpha*dt)
+    	end if
+    
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
+    subroutine computeFlowRate(u,Q_g)
+		type(vectorField), intent(in) :: u
+		real(DP), intent(out) :: Q_g
+		type(grid), pointer :: mesh
+		type(mpiControl), pointer :: mpic
+		integer :: i,j,k,nx,ny,nz,ierror
+		real(DP) :: Q
+
+        mesh => u%ptrMesh_
+        mpic => mesh%ptrMPIC_
+        
+        nx = mesh%nx_
+        ny = mesh%ny_
+        nz = mesh%nz_ 
+    
+    	Q = 0.d0
+		!$OMP PARALLEL DO DEFAULT(none) &
+		!$OMP PRIVATE(i,j,k) &
+		!$OMP SHARED(u,mesh,nx,ny,nz) &
+		!$OMP REDUCTION(+:Q)
+    	do k=1,nz
+    		do j=1,ny
+    			do i=0,nx-1			
+    				
+    				Q = Q + u%ux_%f_(i,j,k)*mesh%Vsx_(i,j,k)
+    				
+    			end do
+    		end do
+    	end do
+    	!$OMP END PARALLEL DO
+    	
+    	call Mpi_Allreduce(Q, Q_g, 1, MPI_DOUBLE_PRECISION, MPI_SUM,  &
+    					   mpic%cartComm_, ierror)
+    
     end subroutine
 !========================================================================================!
 
