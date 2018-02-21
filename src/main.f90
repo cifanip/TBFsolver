@@ -42,7 +42,7 @@ PROGRAM main
 	type(rampUpProp) :: rhoRamp,muRamp
 	real(DP) :: t_S, t_E, t_S0, t_E0
 
-	
+
 	call MPI_INIT(ierror)
 	call mpiGVAR()
 	call mpiControlCTOR(mpiCTRL)
@@ -73,7 +73,6 @@ PROGRAM main
 		write(*,'(A,'//s_intFormat(2:3)//',A)') &
 				'INIT TIME-INTEGRATOR on ', mpiCTRL%nProcs_*N_THREADS, ' cores'
 	end if
-	
 
 	!cycle time loop
 	do while (timeloop(runTime))
@@ -83,11 +82,6 @@ PROGRAM main
 		!update ramped props
 		call updateProp(rhoRamp,runTime%t_,vofS%rhog_)
 		call updateProp(muRamp,runTime%t_,vofS%mug_)
-		
-		!******* channel flow 
-		!set pressure grad
-		call setCHf(uEqn%fs_,uEqn%gCH_,vofS%rhog_,vofS%rhol_,vofS%mul_,cs)
-		!*******
 
 		!update stats
 		call updateStats(stats,runTime%t_,runTime%dt_)
@@ -100,12 +94,15 @@ PROGRAM main
 			!update surface tension and mat pros
 			call computeSurfaceTension(vofS,st,curv)			
 			call updateMaterialProps(vofS,c,cs,rho,mu)
+			
+			call setPressGrad(uEqn%flowCtrl_,cs,rho,vofS%rhog_,vofS%rhol_,&
+			 		          vofS%mul_,uEqn%gCH_,uEqn%fs_)
 
 			!solve momentum equation
 			call solveMomentumEqn(uEqn,u,p,mu,rho,st,c)
-		
+
 			!solve poisson equation
-			call solvePoissonEqn(pEqn,psi,rho,u)		
+			call solvePoissonEqn(pEqn,psi,rho,u)	
 			
 			!divergence free velocity			
 !DIR$ IF DEFINED (FAST_MODE)
@@ -113,6 +110,10 @@ PROGRAM main
 !DIR$ ELSEIF DEFINED (MG_MODE)
 			call makeVelocityDivFree(uEqn,u,psi,rho)
 !DIR$ ENDIF
+
+			!set flow rate
+			call setFlowRate(uEqn%flowCtrl_,u,rho,uEqn%Q0_,runTime%dt_,&
+					         alphaRKS(runTime))
 
 			!print out continuity error
     		call computeContinuityError(u,runTime%dt_)
@@ -125,7 +126,7 @@ PROGRAM main
 !DIR$ ENDIF
 			
 		end do	
-		
+
 		!call computeVorticity(u,w)
 
 		if (timeOutput(runTime)) then
@@ -166,5 +167,5 @@ PROGRAM main
 contains
 
 
-END PROGRAM main
+END PROGRAM main	
 
