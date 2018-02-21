@@ -1049,11 +1049,11 @@ contains
 		integer :: nref
 		real(DP) :: x0,y0,z0,R
 		
-		call readParameter(dict,nref,'nref')
-		call readParameter(dict,x0,'x0')
-		call readParameter(dict,y0,'y0')
-		call readParameter(dict,z0,'z0')
-		call readParameter(dict,R,'R')
+		call readParameter(dict,nref,'nref',bcast=.FALSE.)
+		call readParameter(dict,x0,'x0',bcast=.FALSE.)
+		call readParameter(dict,y0,'y0',bcast=.FALSE.)
+		call readParameter(dict,z0,'z0',bcast=.FALSE.)
+		call readParameter(dict,R,'R',bcast=.FALSE.)
 					
 		!set static bubble number
 		s_nb = 1
@@ -1081,17 +1081,17 @@ contains
 		real(DP) :: x0_b1,y0_b1,z0_b1,R_b1
 		real(DP) :: x0_b2,y0_b2,z0_b2,R_b2
 		
-		call readParameter(dict,nref,'nref')
+		call readParameter(dict,nref,'nref',bcast=.FALSE.)
 		!b1
-		call readParameter(dict,x0_b1,'x0_b1')
-		call readParameter(dict,y0_b1,'y0_b1')
-		call readParameter(dict,z0_b1,'z0_b1')
-		call readParameter(dict,R_b1,'R_b1')
+		call readParameter(dict,x0_b1,'x0_b1',bcast=.FALSE.)
+		call readParameter(dict,y0_b1,'y0_b1',bcast=.FALSE.)
+		call readParameter(dict,z0_b1,'z0_b1',bcast=.FALSE.)
+		call readParameter(dict,R_b1,'R_b1',bcast=.FALSE.)
 		!b2
-		call readParameter(dict,x0_b2,'x0_b2')
-		call readParameter(dict,y0_b2,'y0_b2')
-		call readParameter(dict,z0_b2,'z0_b2')
-		call readParameter(dict,R_b2,'R_b2')
+		call readParameter(dict,x0_b2,'x0_b2',bcast=.FALSE.)
+		call readParameter(dict,y0_b2,'y0_b2',bcast=.FALSE.)
+		call readParameter(dict,z0_b2,'z0_b2',bcast=.FALSE.)
+		call readParameter(dict,R_b2,'R_b2',bcast=.FALSE.)
 					
 		!set static bubble number
 		s_nb = 2
@@ -1144,12 +1144,12 @@ contains
 		dy = Ly/ny
 		dz = Lz/nz
 		
-		call readParameter(dict,nbx,'nbx')
-		call readParameter(dict,nby,'nby')
-		call readParameter(dict,nbz,'nbz')
-		call readParameter(dict,nref,'nref')
-		call readParameter(dict,R,'R')
-		call readParameter(dict,random_distr,'random_distr')
+		call readParameter(dict,nbx,'nbx',bcast=.FALSE.)
+		call readParameter(dict,nby,'nby',bcast=.FALSE.)
+		call readParameter(dict,nbz,'nbz',bcast=.FALSE.)
+		call readParameter(dict,nref,'nref',bcast=.FALSE.)
+		call readParameter(dict,R,'R',bcast=.FALSE.)
+		call readParameter(dict,random_distr,'random_distr',bcast=.FALSE.)
 
 		!bubble displacement 
 		dxb = Lx/nbx
@@ -1445,9 +1445,9 @@ contains
 		if (IS_MASTER) then		
 		
 			call dictionaryCTOR(dict,'initBubbles','specs')
-			call readParameter(dict,method,'method')
+			call readParameter(dict,method,'method',bcast=.FALSE.)
 			!number of refinements
-			call readParameter(dict,nref,'nref')
+			call readParameter(dict,nref,'nref',bcast=.FALSE.)
 		
 			select case(method)
 				case(single_bubbles)
@@ -4648,11 +4648,6 @@ contains
 
 !========================================================================================!
     subroutine computeBlockCurvature(this,vofb)
-! ************************************************************************************** !
-! This subroutine is an implementation based on the GHF method developed in:
-! Popinet, Stéphane. "An accurate adaptive solver for surface-tension-driven interfacial 
-! flows." Journal of Computational Physics 228.16 (2009): 5838-5866.
-! ************************************************************************************** !
         type(VOF), intent(in) :: this
         type(vofBlock), intent(inout) :: vofb
         integer :: i, j, k
@@ -5448,12 +5443,6 @@ contains
 
 !========================================================================================!
     subroutine qCell(vofb,i,j,k,m0,v,delta,q)
-! ************************************************************************************** !
-! This subroutine is an implementation of the reconstruction routines developed in:  
-! Scardovelli, Ruben, and Stephane Zaleski. "Analytical relations connecting linear 
-! interfaces and volume fractions in rectangular grids." 
-! Journal of Computational Physics 164.1 (2000): 228-237.
-! ************************************************************************************** !
     	type(vofBlock), intent(inout) :: vofb
     	integer, intent(in) :: i,j,k
     	real(DP), dimension(3), intent(in) :: m0, delta
@@ -5589,12 +5578,6 @@ contains
 
 !========================================================================================!
     subroutine vCell(vofb,i,j,k,m0,q0,delta,v)
-! ************************************************************************************** !
-! This subroutine is an implementation of the reconstruction routines developed in:  
-! Scardovelli, Ruben, and Stephane Zaleski. "Analytical relations connecting linear 
-! interfaces and volume fractions in rectangular grids." 
-! Journal of Computational Physics 164.1 (2000): 228-237.
-! ************************************************************************************** !
     	type(vofBlock), intent(inout) :: vofb
     	integer, intent(in) :: i,j,k
     	real(DP), dimension(3), intent(in) :: m0, delta
