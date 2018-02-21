@@ -1,21 +1,3 @@
-! ************************************************************************************** !
-!    TBFsolver - DNS turbulent bubbly flow solver
-!    Copyright (C) 2018  University of Twente.
-!
-!    This program is free software: you can redistribute it and/or modify
-!    it under the terms of the GNU General Public License as published by
-!    the Free Software Foundation, either version 3 of the License, or
-!    (at your option) any later version.
-!
-!    This program is distributed in the hope that it will be useful,
-!    but WITHOUT ANY WARRANTY; without even the implied warranty of
-!    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-!    GNU General Public License for more details.
-!
-!    You should have received a copy of the GNU General Public License
-!    along with this program.  If not, see <https://www.gnu.org/licenses/>.
-! ************************************************************************************** !
-
 module momentumEqnMod
 	
 	use timeMod
@@ -35,6 +17,9 @@ module momentumEqnMod
 		real(DP), allocatable, dimension(:,:,:) :: phiX_, phiY_, phiZ_
 		real(DP), allocatable, dimension(:,:,:) :: phiPrevX_, phiPrevY_, phiPrevZ_
 		
+		!volume stag cells ux
+		real(DP), allocatable, dimension(:,:,:) :: Vsx_
+		
 		!momentum equation bounds
 		integer :: isx_, iex_, jsx_, jex_, ksx_, kex_
 		integer :: isy_, iey_, jsy_, jey_, ksy_, key_
@@ -48,6 +33,12 @@ module momentumEqnMod
 		
 		!uniform source term 
 		real(DP) :: fs_, g_, gCH_
+		
+		!flow rate
+		real(DP) :: Q0_
+		
+		!flow control
+		integer :: flowCtrl_
 
 	end type
 	
@@ -68,6 +59,7 @@ module momentumEqnMod
 	public :: momentumEqnCTOR
 	public :: makeVelocityDivFree
 	public :: solveMomentumEqn
+	public :: setFlowRate
 	public :: printOldTimeFlux
 
   	
@@ -80,11 +72,14 @@ contains
 		type(grid), intent(in), target :: gMesh,mesh
         type(vectorField), intent(in) :: u
         type(time), intent(in), target :: rt
-        type(dictionary) :: dict_conv, dict_g
+        type(dictionary) :: dict_conv, dict_flow, dict_g
         
         call dictionaryCTOR(dict_conv,'schemes','specs')
         !read k convection scheme parameter
         call readParameter(dict_conv,this%k_,'k')
+        
+        call dictionaryCTOR(dict_flow,'flowControl','specs')
+        call readParameter(dict_flow,this%flowCtrl_,'flowCtrl')
 
 		this%ptrMesh_ => mesh
 		this%ptrTime_ => rt
@@ -108,6 +103,10 @@ contains
         !init source term
         this%fs_ = 0.d0
         
+        if (this%flowCtrl_==2) then
+        	call computeFlowRate(u,this%Q0_)      	
+        end if
+        
         !read gravity
 		call dictionaryCTOR(dict_g,'parameters','specs')
         call readParameter(dict_g,this%g_,'g')
@@ -115,9 +114,47 @@ contains
         
         !init u0 if AB2
         call initOldTimeFlux(this,gMesh,mesh,rt)
-
 					    
 	end subroutine
+!========================================================================================!
+
+!========================================================================================!
+    subroutine solveMomentumEqn(this,u,p,mu,rho,st,c)
+    	type(momentumEqn), intent(inout) :: this
+    	type(vectorField), intent(inout) :: u
+    	type(scalarField), intent(in) :: p, mu, rho, c
+    	type(vectorField), intent(in) :: st
+    	real(DP) :: start, finish
+    	
+
+    	start = MPI_Wtime() 
+    	
+    	!copy fluxes to Prev arrays
+		call copyOldFluxes(this)
+			
+    	!reset fluxes for computation of new fluxes
+    	call resetFluxes(this)
+    	
+    	!update fluxes
+    	call updateConveDiff(this,u,mu,rho)
+		call addConvDiff(this,u)
+    		
+    	!add pressure grad
+    	!call addPressureGrad(this,u,p,rho)
+    	
+    	!add sources
+    	call addSource(this,u,rho,st,c)
+    	
+    	!update boundaries
+    	call updateBoundariesV(u)
+    	
+    	finish = MPI_Wtime()
+    	
+    	!print-out info
+    	call info(this,finish-start)
+    	
+        
+    end subroutine
 !========================================================================================!
 
 !========================================================================================!
@@ -473,6 +510,63 @@ contains
 !========================================================================================!
 
 !========================================================================================!
+    subroutine addConvDiff(this,u)
+    	type(momentumEqn), intent(in) :: this
+    	type(vectorField), intent(inout) :: u 
+    	real(DP) :: dt, gamma, xi, alpha
+    	integer :: i,j,k
+    	
+    	dt = this%ptrTime_%dt_
+    	alpha = alphaRKS(this%ptrTime_)
+    	gamma = gammaRKS(this%ptrTime_)
+    	xi = xiRKS(this%ptrTime_)
+    		
+ 		!$OMP PARALLEL DO DEFAULT(none) &
+		!$OMP SHARED(this,u) &
+		!$OMP SHARED(dt,alpha,gamma,xi) &
+		!$OMP PRIVATE(i,j,k)   	
+    	do k=this%ksx_,this%kex_
+    		do j=this%jsx_,this%jex_
+    			do i=this%isx_,this%iex_
+    				u%ux_%f_(i,j,k) = u%ux_%f_(i,j,k) + &
+    							      dt*(gamma*this%phiX_(i,j,k) + xi*this%phiPrevX_(i,j,k)) 								
+    			end do
+    		end do
+    	end do
+    	!$OMP END PARALLEL DO
+    	
+ 		!$OMP PARALLEL DO DEFAULT(none) &
+		!$OMP SHARED(this,u) &
+		!$OMP SHARED(dt,alpha,gamma,xi) &
+		!$OMP PRIVATE(i,j,k) 
+    	do k=this%ksy_,this%key_
+    		do j=this%jsy_,this%jey_
+    			do i=this%isy_,this%iey_
+ 					u%uy_%f_(i,j,k) = u%uy_%f_(i,j,k) + &
+    								  dt*(gamma*this%phiY_(i,j,k) + xi*this%phiPrevY_(i,j,k))    								
+    			end do
+    		end do
+    	end do   
+    	!$OMP END PARALLEL DO 
+    	
+ 		!$OMP PARALLEL DO DEFAULT(none) &
+		!$OMP SHARED(this,u) &
+		!$OMP SHARED(dt,alpha,gamma,xi) &
+		!$OMP PRIVATE(i,j,k) 
+    	do k=this%ksz_,this%kez_
+    		do j=this%jsz_,this%jez_
+    			do i=this%isz_,this%iez_
+					u%uz_%f_(i,j,k)  = u%uz_%f_(i,j,k) + &
+    								   dt*(gamma*this%phiZ_(i,j,k) + xi*this%phiPrevZ_(i,j,k))  								
+    			end do
+    		end do
+    	end do
+    	!$OMP END PARALLEL DO 	
+    	
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
     subroutine addPressureGrad(this,u,p,rho)
     	type(momentumEqn), intent(in) :: this
     	type(vectorField), intent(inout) :: u
@@ -630,102 +724,6 @@ contains
 
     end subroutine
     	
-!========================================================================================!
-
-!========================================================================================!
-    subroutine solveMomentumEqn(this,u,p,mu,rho,st,c)
-    	type(momentumEqn), intent(inout) :: this
-    	type(vectorField), intent(inout) :: u
-    	type(scalarField), intent(in) :: p, mu, rho, c
-    	type(vectorField), intent(in) :: st
-    	real(DP) :: start, finish
-    	
-
-    	start = MPI_Wtime() 
-    	
-    	!copy fluxes to Prev arrays
-		call copyOldFluxes(this)
-			
-    	!reset fluxes for computation of new fluxes
-    	call resetFluxes(this)
-    	
-    	!update fluxes
-    	call updateConveDiff(this,u,mu,rho)
-		call addConvDiff(this,u)
-    		
-    	!add pressure grad
-    	!call addPressureGrad(this,u,p,rho)
-    	
-    	!add sources
-    	call addSource(this,u,rho,st,c)
-    	
-    	!update boundaries
-    	call updateBoundariesV(u)
-    	
-    	finish = MPI_Wtime()
-    	
-    	!print-out info
-    	call info(this,finish-start)
-    	
-        
-    end subroutine
-!========================================================================================!
-
-!========================================================================================!
-    subroutine addConvDiff(this,u)
-    	type(momentumEqn), intent(in) :: this
-    	type(vectorField), intent(inout) :: u 
-    	real(DP) :: dt, gamma, xi, alpha
-    	integer :: i,j,k
-    	
-    	dt = this%ptrTime_%dt_
-    	alpha = alphaRKS(this%ptrTime_)
-    	gamma = gammaRKS(this%ptrTime_)
-    	xi = xiRKS(this%ptrTime_)
-    		
- 		!$OMP PARALLEL DO DEFAULT(none) &
-		!$OMP SHARED(this,u) &
-		!$OMP SHARED(dt,alpha,gamma,xi) &
-		!$OMP PRIVATE(i,j,k)   	
-    	do k=this%ksx_,this%kex_
-    		do j=this%jsx_,this%jex_
-    			do i=this%isx_,this%iex_
-    				u%ux_%f_(i,j,k) = u%ux_%f_(i,j,k) + &
-    							      dt*(gamma*this%phiX_(i,j,k) + xi*this%phiPrevX_(i,j,k)) 								
-    			end do
-    		end do
-    	end do
-    	!$OMP END PARALLEL DO
-    	
- 		!$OMP PARALLEL DO DEFAULT(none) &
-		!$OMP SHARED(this,u) &
-		!$OMP SHARED(dt,alpha,gamma,xi) &
-		!$OMP PRIVATE(i,j,k) 
-    	do k=this%ksy_,this%key_
-    		do j=this%jsy_,this%jey_
-    			do i=this%isy_,this%iey_
- 					u%uy_%f_(i,j,k) = u%uy_%f_(i,j,k) + &
-    								  dt*(gamma*this%phiY_(i,j,k) + xi*this%phiPrevY_(i,j,k))    								
-    			end do
-    		end do
-    	end do   
-    	!$OMP END PARALLEL DO 
-    	
- 		!$OMP PARALLEL DO DEFAULT(none) &
-		!$OMP SHARED(this,u) &
-		!$OMP SHARED(dt,alpha,gamma,xi) &
-		!$OMP PRIVATE(i,j,k) 
-    	do k=this%ksz_,this%kez_
-    		do j=this%jsz_,this%jez_
-    			do i=this%isz_,this%iez_
-					u%uz_%f_(i,j,k)  = u%uz_%f_(i,j,k) + &
-    								   dt*(gamma*this%phiZ_(i,j,k) + xi*this%phiPrevZ_(i,j,k))  								
-    			end do
-    		end do
-    	end do
-    	!$OMP END PARALLEL DO 	
-    	
-    end subroutine
 !========================================================================================!
 
 !========================================================================================!
