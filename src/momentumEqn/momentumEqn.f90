@@ -338,12 +338,14 @@ contains
 					
 							!***********************  convection  ***********************!
 							!d (uv) / dx
-							qp = 0.5d0*(u%ux_%f_(i,j,k)+u%ux_%f_(i,jp,k))
+							qp = 0.5d0*(u%ux_%f_(i,jp,k)*mesh%dyf_(jp)+ &
+							            u%ux_%f_(i,j,k)*mesh%dyf_(j))/mesh%dyc_(jp)
 							Ap = r*(-u%uy_%f_(im,j,k)+2.d0*u%uy_%f_(i,j,k)-u%uy_%f_(ip,j,k))
 							Bp = r*(-u%uy_%f_(i,j,k)+2.d0*u%uy_%f_(ip,j,k)-u%uy_%f_(ipp,j,k))
 							Fp = qp*0.5d0*(u%uy_%f_(i,j,k)+u%uy_%f_(ip,j,k)) + max(qp,0.d0)*Ap + min(qp,0.d0)*Bp
 					
-							qm = 0.5d0*(u%ux_%f_(im,j,k)+u%ux_%f_(im,jp,k))
+							qm = 0.5d0*(u%ux_%f_(im,jp,k)*mesh%dyf_(jp)+ &
+							            u%ux_%f_(im,j,k)*mesh%dyf_(j))/mesh%dyc_(jp)
 							Am = r*(-u%uy_%f_(imm,j,k)+2.d0*u%uy_%f_(im,j,k)-u%uy_%f_(i,j,k))
 							Bm = r*(-u%uy_%f_(im,j,k)+2.d0*u%uy_%f_(i,j,k)-u%uy_%f_(ip,j,k))
 							Fm = qm*0.5d0*(u%uy_%f_(i,j,k)+u%uy_%f_(im,j,k)) + max(qm,0.d0)*Ap + min(qm,0.d0)*Bp
@@ -364,12 +366,14 @@ contains
 							this%phiY_(i,j,k) = this%phiY_(i,j,k) - (Fp-Fm)/this%ptrMesh_%dyc_(jp)
 					
 							!d (wv) / dz
-							qp = 0.5d0*(u%uz_%f_(i,j,k)+u%uz_%f_(i,jp,k))
+							qp = 0.5d0*(u%uz_%f_(i,jp,k)*mesh%dyf_(jp)+ &
+									    u%uz_%f_(i,j,k)*mesh%dyf_(j))/mesh%dyc_(jp)	
 							Ap = r*(-u%uy_%f_(i,j,km)+2.d0*u%uy_%f_(i,j,k)-u%uy_%f_(i,j,kp))
 							Bp = r*(-u%uy_%f_(i,j,k)+2.d0*u%uy_%f_(i,j,kp)-u%uy_%f_(i,j,kpp))
 							Fp = qp*0.5d0*(u%uy_%f_(i,j,k)+u%uy_%f_(i,j,kp)) + max(qp,0.d0)*Ap + min(qp,0.d0)*Bp
 					
-							qm = 0.5d0*(u%uz_%f_(i,j,km)+u%uz_%f_(i,jp,km))
+							qm = 0.5d0*(u%uz_%f_(i,jp,km)*mesh%dyf_(jp)+ &
+									    u%uz_%f_(i,j,km)*mesh%dyf_(j))/mesh%dyc_(jp)
 							Am = r*(-u%uy_%f_(i,j,kmm)+2.d0*u%uy_%f_(i,j,km)-u%uy_%f_(i,j,k))
 							Bm = r*(-u%uy_%f_(i,j,km)+2.d0*u%uy_%f_(i,j,k)-u%uy_%f_(i,j,kp))
 							Fm = qm*0.5d0*(u%uy_%f_(i,j,k)+u%uy_%f_(i,j,km)) + max(qm,0.d0)*Ap + min(qm,0.d0)*Bp
