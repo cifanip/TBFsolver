@@ -19,7 +19,7 @@
 module mpiControlMod
 	
 	use allocateArraysMod
-	use dictionaryMod
+	use parFileMod
 	
 	implicit none
 	
@@ -52,14 +52,14 @@ module mpiControlMod
 
 	end type
 	
-	private :: readMeshDict
-	private :: readDecomposeDict
+	private :: readMeshpfile
+	private :: readDecomposepfile
 	private :: setNeighboursProc
 	private :: setGlobalCoord
-!DIR$ IF DEFINED (FAST_MODE)
+#ifdef FAST_MODE
 	private :: checkPeriodicDirFFT
 	private :: checkPencilDecomp
-!DIR$ ENDIF
+#endif
 	
 	public :: mpiControlCTOR
   	
@@ -75,11 +75,11 @@ contains
         !set number of procs
         call MPI_COMM_SIZE(MPI_COMM_WORLD, this%nProcs_, ierr)
 		
-		!read meshDict
-		call readMeshDict(this)
+		!read meshpfile
+		call readMeshpfile(this)
 		
-		!read decomposeDict
-		call readDecomposeDict(this)
+		!read decomposepfile
+		call readDecomposepfile(this)
 		
 		!create cartesian communicator
 		call MPI_CART_CREATE(MPI_COMM_WORLD,   &
@@ -102,10 +102,10 @@ contains
 		!set global cart coordinates to All procs
 		call setGlobalCoord(this)
 
-!DIR$ IF DEFINED (FAST_MODE)
+#ifdef FAST_MODE
 		call checkPeriodicDirFFT(this)
 		call checkPencilDecomp(this)
-!DIR$ ENDIF	
+#endif
 		
 		        		
 		  
@@ -114,17 +114,17 @@ contains
 
 
 !========================================================================================!
-	subroutine readDecomposeDict(this)
+	subroutine readDecomposepfile(this)
 		type(mpiControl), intent(inout) :: this
-		type(dictionary) :: dict
+		type(parFile) :: pfile
 		
-		call dictionaryCTOR(dict,'decompose','specs')
+		call parFileCTOR(pfile,'decompose','specs')
 		
 		!set number of procs per axis
 		if (IS_PAR) then
-			call readParameter(dict,this%nProcsAxis_(1),'px')
-			call readParameter(dict,this%nProcsAxis_(2),'py')
-			call readParameter(dict,this%nProcsAxis_(3),'pz') 
+			call readParameter(pfile,this%nProcsAxis_(1),'px')
+			call readParameter(pfile,this%nProcsAxis_(2),'py')
+			call readParameter(pfile,this%nProcsAxis_(3),'pz') 
 		else
 			this%nProcsAxis_(1) = 1
 			this%nProcsAxis_(2) = 1
@@ -148,23 +148,23 @@ contains
 		end if
 		
 		!set wrap around option 
-		call readParameter(dict,this%wrapAround_(1),'wrap_x')
-		call readParameter(dict,this%wrapAround_(2),'wrap_y')
-		call readParameter(dict,this%wrapAround_(3),'wrap_z') 
+		call readParameter(pfile,this%wrapAround_(1),'wrap_x')
+		call readParameter(pfile,this%wrapAround_(2),'wrap_y')
+		call readParameter(pfile,this%wrapAround_(3),'wrap_z') 
 
 	end subroutine
 !========================================================================================!
 
 !========================================================================================!
-	subroutine readMeshDict(this)
+	subroutine readMeshpfile(this)
 		type(mpiControl), intent(inout) :: this
-		type(dictionary) :: dict
+		type(parFile) :: pfile
 		
-		 call dictionaryCTOR(dict,'mesh','specs')
+		 call parFileCTOR(pfile,'mesh','specs')
 		
-		call readParameter(dict,this%nx_,'nx')
-		call readParameter(dict,this%ny_,'ny')
-		call readParameter(dict,this%nz_,'nz')
+		call readParameter(pfile,this%nx_,'nx')
+		call readParameter(pfile,this%ny_,'ny')
+		call readParameter(pfile,this%nz_,'nz')
 
 
 	end subroutine
@@ -201,7 +201,7 @@ contains
 	end subroutine
 !========================================================================================!
 
-!DIR$ IF DEFINED (FAST_MODE)
+#ifdef FAST_MODE
 !========================================================================================!
 	subroutine checkPeriodicDirFFT(this)
 		type(mpiControl), intent(in) :: this
@@ -222,13 +222,12 @@ contains
 		type(mpiControl), intent(in) :: this
 		
 		if (this%nProcsAxis_(2)>1) then
-		!if (this%nProcsAxis_(1)>1) then
 			call mpiAbort('n procs along pencil > 1')
 		end if
 
 	end subroutine
 !========================================================================================!
-!DIR$ ENDIF	
+#endif	
 	
 end module mpiControlMod
 

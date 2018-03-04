@@ -18,7 +18,7 @@
 
 module statisticsMod
 
-	use vectorFieldMod
+	use vfieldMod
 	
 	implicit none
 	
@@ -58,10 +58,10 @@ module statisticsMod
 		real(DP), private :: Ts_
 		
 		type(grid), pointer :: gmesh_ => NULL()
-		type(vectorField), pointer :: u_ => NULL()
-		type(vectorField), pointer :: w_ => NULL()
-		type(scalarField), pointer :: p_ => NULL()
-		type(scalarField), pointer :: c_ => NULL()
+		type(vfield), pointer :: u_ => NULL()
+		type(vfield), pointer :: w_ => NULL()
+		type(field), pointer :: p_ => NULL()
+		type(field), pointer :: c_ => NULL()
 		
 		!slice volume
 		real(DP), allocatable, dimension(:) :: Vs_
@@ -99,11 +99,11 @@ contains
 !========================================================================================!
 	subroutine statisticsCTOR(this,u,w,p,c,nu,gmesh)
 		type(statistics), intent(out) :: this
-		type(vectorField), target, intent(in) :: u,w
-		type(scalarField), target, intent(in) :: p,c
+		type(vfield), target, intent(in) :: u,w
+		type(field), target, intent(in) :: p,c
 		real(DP), intent(in) :: nu
 		type(grid), target, intent(in) :: gmesh
-		type(dictionary) :: dict
+		type(parFile) :: pfile
 		integer :: nyg
 		
 		this%p_ => p
@@ -117,8 +117,8 @@ contains
 			this%gmesh_ => gmesh
 		end if
 
-		call dictionaryCTOR(dict,'timeControl','specs')
-		call readParameter(dict,this%Ts_,'Ts')
+		call parFileCTOR(pfile,'timeControl','specs')
+		call readParameter(pfile,this%Ts_,'Ts')
 
 		nyg = p%ptrMesh_%nyg_
 		

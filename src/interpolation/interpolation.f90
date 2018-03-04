@@ -22,11 +22,11 @@ module interpolationMod
 
 	implicit none
 
-!DIR$ IF DEFINED (MG_MODE)	
+#ifdef MG_MODE	
 	public :: restrictionOp2D
 	public :: restrictionOp3D
 	public :: prolongationOp3D
-!DIR$ ENDIF
+#endif
 	public :: cellToVertex
 	public :: vertexToCell
 	public :: cellToVertexBlock
@@ -36,7 +36,7 @@ module interpolationMod
 contains
 
 ! 						2D restriction op: bilinear interp
-!DIR$ IF DEFINED (MG_MODE)
+#ifdef MG_MODE
 !========================================================================================!
 	subroutine restrictionOp2D(qf,qc,xf,yf,xc,yc) 
 		!c = coarse
@@ -180,7 +180,8 @@ contains
 		
 	end subroutine
 !========================================================================================!
-!DIR$ ENDIF
+
+#endif
 
 ! 						3D interpolation to vertces: trilinear interp
 !========================================================================================!

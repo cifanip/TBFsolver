@@ -35,13 +35,13 @@ module timeMod
 		integer, private :: writeIter_
 		
 		!adaptive time-step based on CFL
-		type(vectorField), pointer, private :: ptrU_ => NULL()
+		type(vfield), pointer, private :: ptrU_ => NULL()
 		logical, private :: adaptiveTimeStep_
 		real(DP), private :: cflLim_
 		real(DP), private :: cflMax_
 	
-		!timeControl dictionary
-		type(dictionary), private :: dict_
+		!timeControl parFile
+		type(parFile), private :: pfile_
 		
 		!counter time iterations
 		integer, private :: iter_
@@ -133,21 +133,21 @@ contains
 !========================================================================================!
 	subroutine timeCTOR(this,u,mpic)
 		type(time), intent(out) :: this
-		type(vectorField), intent(in), target :: u
+		type(vfield), intent(in), target :: u
 		type(mpiControl), intent(in) :: mpic
 		
 		this%ptrU_ => u
 		
-		call dictionaryCTOR(this%dict_,'timeControl','specs')
+		call parFileCTOR(this%pfile_,'timeControl','specs')
 
-		call readParameter(this%dict_,this%Tf_,'Tf')
-		call readParameter(this%dict_,this%dt_,'dt')
-		call readParameter(this%dict_,this%inputFold_,'input_folder')
-		call readParameter(this%dict_,this%writeInterval_,'writeInterval')
-		call readParameter(this%dict_,this%dtout_,'dtout')
-		call readParameter(this%dict_,this%adaptiveTimeStep_,'adaptiveTimeStep')
-		call readParameter(this%dict_,this%cflLim_,'cflMax')
-		call readParameter(this%dict_,this%dtVOFB_,'vofBlocksRedInterval')
+		call readParameter(this%pfile_,this%Tf_,'Tf')
+		call readParameter(this%pfile_,this%dt_,'dt')
+		call readParameter(this%pfile_,this%inputFold_,'input_folder')
+		call readParameter(this%pfile_,this%writeInterval_,'writeInterval')
+		call readParameter(this%pfile_,this%dtout_,'dtout')
+		call readParameter(this%pfile_,this%adaptiveTimeStep_,'adaptiveTimeStep')
+		call readParameter(this%pfile_,this%cflLim_,'cflMax')
+		call readParameter(this%pfile_,this%dtVOFB_,'vofBlocksRedInterval')
 		
 		this%tout_ = this%dtout_
 		this%iter_ = 0
@@ -297,10 +297,10 @@ contains
 !========================================================================================!
     subroutine initRK3coef(this)
     	type(time), intent(inout) :: this
-    	type(dictionary) :: dict
+    	type(parFile) :: dict
     	
     	
-    	call dictionaryCTOR(dict,'schemes','specs')
+    	call parFileCTOR(dict,'schemes','specs')
     	call readParameter(dict,this%scheme_,'time_scheme')
     
     	if (this%scheme_==1) then

@@ -18,7 +18,7 @@
 
 module rampUpPropMod
 
-	use dictionaryMod
+	use parFileMod
 	
 	implicit none
 	
@@ -46,11 +46,11 @@ contains
 		type(rampUpProp), intent(out) :: this
 		real(DP), intent(inout) :: p
 		real(DP) :: startValue,endValue
-		type(dictionary) :: dict
+		type(parFile) :: pfile
 		
-		call dictionaryCTOR(dict,'timeControl','specs')
-		call readParameter(dict,this%Tr_,'Tr')
-		call readParameter(dict,this%isRampUp_,'isRampUp')
+		call parFileCTOR(pfile,'timeControl','specs')
+		call readParameter(pfile,this%Tr_,'Tr')
+		call readParameter(pfile,this%isRampUp_,'isRampUp')
 		
 		this%startValue_ = startValue
 		this%endValue_ = endValue

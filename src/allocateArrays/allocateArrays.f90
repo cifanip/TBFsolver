@@ -24,10 +24,10 @@ module allocateArraysMod
 	implicit none
 	
 	interface allocateArray
-!DIR$ IF DEFINED (FAST_MODE)		
+#ifdef FAST_MODE		
 		module PROCEDURE allocateArray1D_complex
 		module PROCEDURE allocateArray3D_complex
-!DIR$ ENDIF	
+#endif	
     	module PROCEDURE allocateArray1D_double
     	module PROCEDURE allocateArray2D_double
     	module PROCEDURE allocateArray3D_double
@@ -49,10 +49,10 @@ module allocateArraysMod
   	end interface
   	
 	interface deallocateArray
-!DIR$ IF DEFINED (FAST_MODE)
+#ifdef FAST_MODE
 		module PROCEDURE deallocateArray1D_complex
 		module PROCEDURE deallocateArray3D_complex
-!DIR$ ENDIF 	
+#endif 	
     	module PROCEDURE deallocateArray1D_double
     	module PROCEDURE deallocateArray2D_double
     	module PROCEDURE deallocateArray3D_double
@@ -101,7 +101,7 @@ contains
 
 ! 										allocate 
 !========================================================================================!
-!DIR$ IF DEFINED (FAST_MODE)
+#ifdef FAST_MODE
 	subroutine allocateArray1D_complex(v,st,en) 
 		integer, intent(IN) :: st, en
 		complex(DP), allocatable, dimension(:), intent(INOUT) :: v
@@ -139,7 +139,7 @@ contains
 		
 	end subroutine
 	
-!DIR$ ENDIF
+#endif
 !========================================================================================!
 
 !========================================================================================!
@@ -437,7 +437,7 @@ contains
 
 ! 										deallocate 
 !========================================================================================!
-!DIR$ IF DEFINED (FAST_MODE)
+#ifdef FAST_MODE
 	subroutine deallocateArray1D_complex(v) 
 		complex(DP), allocatable, dimension(:), intent(INOUT) :: v
 
@@ -455,7 +455,7 @@ contains
         end if
 		
 	end subroutine
-!DIR$ ENDIF
+#endif
 !========================================================================================!
 
 !========================================================================================!

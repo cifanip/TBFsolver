@@ -18,7 +18,7 @@
 
 module auxiliaryRoutinesMod
 
-	use vectorFieldMod
+	use vfieldMod
 
 	implicit none
 
@@ -37,7 +37,7 @@ contains
 
 !========================================================================================!
     subroutine computeContinuityError(u,dt)
-		type(vectorField), intent(in) :: u
+		type(vfield), intent(in) :: u
 		real(DP), intent(in) :: dt
 		type(grid), pointer :: mesh
 		type(mpiControl), pointer :: mpic
@@ -90,7 +90,7 @@ contains
 
 !========================================================================================!
     function computeCFLmax(u,dt) result(cflg)
-		type(vectorField), intent(in) :: u
+		type(vfield), intent(in) :: u
 		real(DP), intent(in) :: dt
 		type(grid), pointer :: mesh
 		type(mpiControl), pointer :: mpic
@@ -140,8 +140,8 @@ contains
 
 !========================================================================================!
     subroutine updateShearFlow(u,u0,t,dt)
-		type(vectorField), intent(inout) :: u
-		type(vectorField), intent(in) :: u0
+		type(vfield), intent(inout) :: u
+		type(vfield), intent(in) :: u0
 		real(DP), intent(in) :: t, dt
 		integer :: i, j, k
 		real(DP) :: Ts, th
@@ -190,7 +190,7 @@ contains
 
 !========================================================================================!
     subroutine shapeError(c,c0,t)
-		type(scalarField), intent(in) :: c, c0
+		type(field), intent(in) :: c, c0
 		real(DP), intent(in) :: t
 		type(grid), pointer :: mesh
 		type(mpiControl), pointer :: mpic
@@ -239,7 +239,7 @@ contains
 !========================================================================================!
     subroutine setPressGrad(f_ctrl,c,rho,rhog,rhol,mul,g,f)
     	integer, intent(in) :: f_ctrl
-    	type(scalarField), intent(in) :: c,rho
+    	type(field), intent(in) :: c,rho
     	real(DP), intent(in) :: rhog,rhol,mul,g
     	real(DP), intent(inout) :: f
     	type(grid), pointer :: mesh
@@ -327,7 +327,7 @@ contains
 
 !========================================================================================!
     subroutine scaleVelocity(u)
-		type(vectorField), intent(inout) :: u
+		type(vfield), intent(inout) :: u
 		real(DP) :: Ubar
 		
 		Ubar = 1.85d1
@@ -342,8 +342,8 @@ contains
 
 !========================================================================================!
     subroutine computeVorticity(u,w)
-		type(vectorField), intent(in) :: u
-		type(vectorField), intent(inout) :: w
+		type(vfield), intent(in) :: u
+		type(vfield), intent(inout) :: w
 		type(grid), pointer :: mesh
 		real(DP) :: duzdy,duydz,duzdx,duxdz,duydx,duxdy
 		integer :: i,j,k,nx,ny,nz
@@ -398,8 +398,8 @@ contains
 !========================================================================================!
     subroutine setFlowRate(ctrl,u,rho,Q,dt,alpha)
     	integer, intent(in) :: ctrl
-		type(vectorField), intent(inout) :: u
-		type(scalarField), intent(in) :: rho
+		type(vfield), intent(inout) :: u
+		type(field), intent(in) :: rho
 		real(DP), intent(in) :: Q,dt,alpha
 		type(grid), pointer :: mesh
 		type(mpiControl), pointer :: mpic
@@ -445,7 +445,7 @@ contains
 
 !========================================================================================!
     subroutine computeFlowRate(u,Q_g)
-		type(vectorField), intent(in) :: u
+		type(vfield), intent(in) :: u
 		real(DP), intent(out) :: Q_g
 		type(grid), pointer :: mesh
 		type(mpiControl), pointer :: mpic

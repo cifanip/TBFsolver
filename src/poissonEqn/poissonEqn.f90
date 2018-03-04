@@ -18,11 +18,12 @@
 
 module poissonEqnMod
 
-!DIR$ IF DEFINED (FAST_MODE)	
+#ifdef FAST_MODE	
 	use fastPoissonSolverMod
-!DIR$ ELSEIF DEFINED (MG_MODE)
+#endif
+#ifdef MG_MODE
 	use pcgMod
-!DIR$ ENDIF
+#endif
 	use timeMod
 	
 	implicit none
@@ -33,44 +34,44 @@ module poissonEqnMod
 		!keep a pointer to grid
 		type(grid), pointer :: ptrMesh_ => NULL() 
 		
-!DIR$ IF DEFINED (FAST_MODE)		
+#ifdef FAST_MODE		
 		type(fastPoissonSolver), private :: fftSolver_
-!DIR$ ELSEIF DEFINED (MG_MODE)
+#endif
+#ifdef MG_MODE
 		type(pcg) :: pcgs_
-!DIR$ ENDIF
+#endif
 		
 		!poisson eqn source
-		type(scalarField), private :: s_
+		type(field), private :: s_
 
-!DIR$ IF DEFINED (MG_MODE)		
+#ifdef MG_MODE
 		!poisson eqn coefficients
-		type(scalarField), private :: beta_
-!DIR$ ENDIF
+		type(field), private :: beta_
+#endif
 		
 		!keep a pointer to time
 		type(time), pointer :: ptrTime_ => NULL()
 
-!DIR$ IF DEFINED (FAST_MODE)		
+#ifdef FAST_MODE		
 		!number of pressure levels
 		integer :: nl_
 		!reference density
 		real(DP) :: rho0_ 
-!DIR$ ENDIF
+#endif
 
 	end type
 	
 	
 	private :: computeSource
-!DIR$ IF DEFINED (MG_MODE)
+#ifdef MG_MODE
 	private :: computeBeta
-!DIR$ ENDIF
+#endif
 	private :: info
-!DIR$ IF DEFINED (FAST_MODE)	
+#ifdef FAST_MODE
 	private :: computeOldPressDiv
 	private :: allocateOldPressure
 	private :: storeOldPressure
-!DIR$ ENDIF
-
+#endif
 	public :: poissonEqnCTOR	
 	public :: solvePoissonEqn
 	public :: updatePressure
@@ -81,31 +82,32 @@ contains
 
 
 !========================================================================================!
-!DIR$ IF DEFINED (FAST_MODE)
+#ifdef FAST_MODE
 	subroutine poissonEqnCTOR(this,mesh,gMesh,psi,rt,rhol,rhog)
 		type(poissonEqn) :: this
 		type(grid), intent(in), target :: mesh,gMesh
-		type(scalarField), intent(inout) :: psi
+		type(field), intent(inout) :: psi
 		type(time), intent(in), target :: rt
 		real(DP), intent(in) :: rhol,rhog
 		integer :: n_old
-!DIR$ ELSEIF DEFINED (MG_MODE)
+#endif
+#ifdef MG_MODE
 	subroutine poissonEqnCTOR(this,mesh,c,psi,rt)
 		type(poissonEqn) :: this
 		type(grid), intent(in), target :: mesh
-		type(scalarField), intent(inout) :: c
-		type(scalarField), intent(inout) :: psi
+		type(field), intent(inout) :: c
+		type(field), intent(inout) :: psi
 		type(time), intent(in), target :: rt
-!DIR$ ENDIF
+#endif
 		
 		this%ptrMesh_ => mesh
 		this%ptrTime_ => rt
 
 		!init source and beta coeff
-		call scalarFieldCTOR(this%s_,'s',mesh,'cl',psi%hd_,initOpt=-1)
+		call fieldCTOR(this%s_,'s',mesh,'cl',psi%hd_,initOpt=-1)
 		call copyBoundary(this%s_,psi)
 		
-!DIR$ IF DEFINED (FAST_MODE)
+#ifdef FAST_MODE
 		call fastPoissonSolverCTOR(this%fftSolver_,mesh,gMesh)
 		
 		!allocate space for old time pressure
@@ -114,23 +116,23 @@ contains
 		
 		!set reference density
 		this%rho0_=min(rhol,rhog)
-		
-!DIR$ ELSEIF DEFINED (MG_MODE)		
-		call scalarFieldCTOR(this%beta_,'beta',mesh,'cl',psi%hd_,initOpt=-1)
+#endif		
+#ifdef MG_MODE
+		call fieldCTOR(this%beta_,'beta',mesh,'cl',psi%hd_,initOpt=-1)
 		call copyBoundary(this%beta_,c)
 
 		call pcgCTOR(this%pcgs_,mesh,psi,this%beta_)		
-!DIR$ ENDIF		
+#endif	
 		
 			    
 	end subroutine
 !========================================================================================!
 
 !========================================================================================!
-!DIR$ IF DEFINED (MG_MODE)
+#ifdef MG_MODE
     subroutine computeSource(this,u)
         type(poissonEqn), intent(inout) :: this
-        type(vectorField), intent(in) :: u
+        type(vfield), intent(in) :: u
         type(grid), pointer :: mesh
         integer :: nx, ny, nz
         integer :: i, j, k
@@ -164,12 +166,12 @@ contains
         !$OMP END PARALLEL DO 
         
     end subroutine
-    
-!DIR$ ELSEIF DEFINED (FAST_MODE)
+#endif   
+#ifdef FAST_MODE
     subroutine computeSource(this,psi,rho,u)
         type(poissonEqn), intent(inout) :: this
-        type(scalarField), intent(in) :: psi,rho
-        type(vectorField), intent(in) :: u
+        type(field), intent(in) :: psi,rho
+        type(vfield), intent(in) :: u
         type(grid), pointer :: mesh
         integer :: nx, ny, nz
         integer :: i, j, k
@@ -234,7 +236,7 @@ contains
     subroutine computeOldPressDiv(dpxp,dpxm,dpyp,dpym,dpzp,dpzm,i,j,k,psi,mesh,n)
     	real(DP), intent(out) :: dpxp,dpxm,dpyp,dpym,dpzp,dpzm
     	integer, intent(in) :: i,j,k,n
-    	type(scalarField), intent(in) :: psi
+    	type(field), intent(in) :: psi
     	type(grid), intent(in) :: mesh
     	
     	select case(n)
@@ -267,14 +269,14 @@ contains
     	end select
 
     end subroutine
-!DIR$ ENDIF
+#endif
 !========================================================================================!
 
 !========================================================================================!
-!DIR$ IF DEFINED (MG_MODE)
+#ifdef MG_MODE
     subroutine computeBeta(this,rho)
         type(poissonEqn), intent(inout) :: this
-        type(scalarField), intent(in) :: rho
+        type(field), intent(in) :: rho
         integer :: nx, ny, nz
         real(DP) :: dt, alpha
         integer :: i,j,k
@@ -304,27 +306,28 @@ contains
         
         
     end subroutine
-!DIR$ ENDIF
+#endif
 !========================================================================================!
 
 !========================================================================================!
     subroutine solvePoissonEqn(this,psi,rho,u)
         type(poissonEqn), intent(inout) :: this
-        type(scalarField), intent(inout) :: psi
-        type(scalarField), intent(in) :: rho
-        type(vectorField), intent(in) :: u
+        type(field), intent(inout) :: psi
+        type(field), intent(in) :: rho
+        type(vfield), intent(in) :: u
         real(DP) :: start, finish
         
         start = MPI_Wtime()   
                    
-!DIR$ IF DEFINED (FAST_MODE)
+#ifdef FAST_MODE
 		call computeSource(this,psi,rho,u)
 		call solveFPS(this%fftSolver_,psi,this%s_) 
-!DIR$ ELSEIF DEFINED (MG_MODE)
+#endif
+#ifdef MG_MODE
 		call computeSource(this,u)
         call computeBeta(this,rho)
         call solvePCG(this%pcgs_,this%ptrMesh_,psi,this%beta_,this%s_)
-!DIR$ ENDIF
+#endif
 
         finish = MPI_Wtime()
         
@@ -334,15 +337,16 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-!DIR$ IF DEFINED (FAST_MODE)
+#ifdef FAST_MODE
     subroutine updatePressure(this,p,psi)
     	type(poissonEqn), intent(in) :: this
-        type(scalarField), intent(inout) :: psi
-!DIR$ ELSEIF DEFINED (MG_MODE)
+        type(field), intent(inout) :: psi
+#endif
+#ifdef MG_MODE
     subroutine updatePressure(p,psi)
-        type(scalarField), intent(in) :: psi
-!DIR$ ENDIF
-		type(scalarField), intent(inout) :: p
+        type(field), intent(in) :: psi
+#endif
+		type(field), intent(inout) :: p
         integer :: nx, ny, nz
         integer :: i,j,k
         
@@ -357,11 +361,12 @@ contains
         do k = 1,nz
         	do j = 1,ny
         		do i = 1,nx
-!DIR$ IF DEFINED (FAST_MODE)
+#ifdef FAST_MODE
         			p%f_(i,j,k) = psi%f_(i,j,k) !+ p%f_(i,j,k)
-!DIR$ ELSEIF DEFINED (MG_MODE)
+#endif
+#ifdef MG_MODE
 					p%f_(i,j,k) = psi%f_(i,j,k) !+ p%f_(i,j,k)
-!DIR$ ENDIF
+#endif
         		end do
         	end do
         end do
@@ -369,10 +374,10 @@ contains
 
         call updateBoundaries(p)
 
-!DIR$ IF DEFINED (FAST_MODE)        
+#ifdef FAST_MODE       
         !store old pressure fields
 		call storeOldPressure(psi,this%nl_)
-!DIR$ ENDIF
+#endif
         
     end subroutine
 !========================================================================================!
@@ -390,26 +395,27 @@ contains
     	call Mpi_Reduce(cpuTime, cpuTime_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, 0, &
     			        comm%cartComm_, ierror)
 
-!DIR$ IF DEFINED (FAST_MODE)
+#ifdef FAST_MODE
 		if (IS_MASTER) then
 			write(*,'(A,'//s_outputFormat(2:9)//')') &
 				'	P Eqn:	CPU time = ', cpuTime_max
 		end if
-!DIR$ ELSEIF DEFINED (MG_MODE)		
+#endif
+#ifdef MG_MODE	
 		if (IS_MASTER) then
 			write(*,'(A,'//s_intFormat(2:3)//',2(A,'//s_outputFormat(2:9)//'))') &
 				'	P Eqn: n iter = ', this%pcgs_%iter_, &
 				'	residual = ', this%pcgs_%res_, '	CPU time = ', cpuTime_max
 		end if
-!DIR$ ENDIF 
+#endif  
 			
 	end subroutine
 !========================================================================================!
 
 !========================================================================================!
-!DIR$ IF DEFINED (FAST_MODE)
+#ifdef FAST_MODE
     recursive subroutine allocateOldPressure(q,n)
-		type(scalarField), intent(inout) :: q
+		type(field), intent(inout) :: q
 		integer, intent(in) :: n
 		integer :: lbi,ubi,lbj,ubj,lbk,ubk
 
@@ -432,7 +438,7 @@ contains
     end subroutine
 
     recursive subroutine storeOldPressure(q,n)
-		type(scalarField), intent(inout) :: q
+		type(field), intent(inout) :: q
 		integer, intent(in) :: n
 
 		if (n>0) then
@@ -445,7 +451,7 @@ contains
 		end if
         
     end subroutine
-!DIR$ ENDIF 
+#endif 
 !========================================================================================!
 
 

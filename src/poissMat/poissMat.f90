@@ -18,7 +18,7 @@
 
 module poissMatMod
 	
-	use scalarFieldMod
+	use fieldMod
 	
 	implicit none
 
@@ -97,7 +97,7 @@ contains
 	subroutine poissMatCTOR(this,mesh,f)
 		type(poissMat) :: this
 		type(grid), intent(in), target :: mesh
-		type(scalarField), intent(in) :: f
+		type(field), intent(in) :: f
 		type(mpiControl), pointer :: ptrMPIC
 		
 		!keep a pointer to mesh
@@ -153,7 +153,7 @@ contains
 !========================================================================================!
 	subroutine allocateMat(this,f) 
 		type(poissMat), intent(inout) :: this
-		type(scalarField), intent(in) :: f
+		type(field), intent(in) :: f
 		integer :: nx, ny, nz
 		integer :: nxg, nyg, nzg
 		integer :: nInter, nBound, nEntries
@@ -277,7 +277,7 @@ contains
 !========================================================================================!
 	subroutine updateSystem(this,f,beta,s) 
 		type(poissMat), intent(inout) :: this
-		type(scalarField), intent(in) :: f, beta, s
+		type(field), intent(in) :: f, beta, s
 		
 		call updateMatrix(this,f,beta)
 		call computeRHS(this,f,beta,s)
@@ -288,8 +288,8 @@ contains
 !========================================================================================!
     subroutine solveMat(this,f,beta,s)
         type(poissMat), intent(inout) :: this
-		type(scalarField), intent(inout) :: f
-		type(scalarField), intent(in) :: beta, s
+		type(field), intent(inout) :: f
+		type(field), intent(in) :: beta, s
 
         
         call updateSystem(this,f,beta,s) 
@@ -315,7 +315,7 @@ contains
 !========================================================================================!
    subroutine scatterSolution(this,f)
         type(poissMat), intent(inout) :: this
-		type(scalarField), intent(inout) :: f
+		type(field), intent(inout) :: f
         integer :: nx, ny, nz
         integer :: nxg, nyg, nzg
         integer :: i, j, k, n, q, np
@@ -402,7 +402,7 @@ contains
 !========================================================================================!
 	subroutine assembleIndexesMat(this,f) 
 		type(poissMat), intent(inout) :: this
-		type(scalarField), intent(in) :: f
+		type(field), intent(in) :: f
 		
 		!init entry counter
 		this%entryCount_ = 0
@@ -506,7 +506,7 @@ contains
 !========================================================================================!
 	subroutine computeBoundaryMatrixIndexes(this,f) 
 		type(poissMat), intent(inout) :: this
-		type(scalarField), intent(in) :: f
+		type(field), intent(in) :: f
 		integer :: i0g, j0g, k0g    !global indexes start
 		integer :: i1g, j1g, k1g    !global indexes end
 		integer :: nxg, nyg, nzg 	!global size
@@ -552,7 +552,7 @@ contains
 !========================================================================================!
 	subroutine computeDiagBoundaryIndexes(this,bf,dir,i0g,i1g,j0g,j1g,k0g,k1g,nxg,nyg) 
 		type(poissMat), intent(inout) :: this
-		type(scalarBoundaryField), intent(in) :: bf
+		type(boundaryField), intent(in) :: bf
 		integer, intent(in) :: dir
 		integer, intent(in) :: i0g, j0g, k0g    !global indexes start
 		integer, intent(in) :: i1g, j1g, k1g    !global indexes end
@@ -587,7 +587,7 @@ contains
 !========================================================================================!
 	subroutine computeOffDiagBoundaryIndexes(this,bf,dir,i0g,i1g,j0g,j1g,k0g,k1g,nxg,nyg,nzg) 
 		type(poissMat), intent(inout) :: this
-		type(scalarBoundaryField), intent(in) :: bf
+		type(boundaryField), intent(in) :: bf
 		integer, intent(in) :: dir
 		integer, intent(in) :: i0g, j0g, k0g    !global indexes start
 		integer, intent(in) :: i1g, j1g, k1g    !global indexes end
@@ -693,8 +693,8 @@ contains
 !========================================================================================!
 	subroutine updateMatrix(this,f,beta) 
 		type(poissMat), intent(inout) :: this
-		type(scalarField), intent(in) :: f
-		type(scalarField), intent(in) :: beta
+		type(field), intent(in) :: f
+		type(field), intent(in) :: beta
 		
 		!init entry counter
 		this%entryCount_ = 0
@@ -713,7 +713,7 @@ contains
 !========================================================================================!
 	subroutine computeInternalMatrixValues(this,beta) 
 		type(poissMat), intent(inout) :: this
-		type(scalarField), intent(in) :: beta
+		type(field), intent(in) :: beta
 		integer :: i, j, k
 		integer :: il, jl, kl
 		integer :: i0g, j0g, k0g, i1g, j1g, k1g	    !global indexes 
@@ -801,8 +801,8 @@ contains
 !========================================================================================!
 	subroutine computeBoundaryMatrixValues(this,f,beta) 
 		type(poissMat), intent(inout) :: this
-		type(scalarField), intent(in) :: f
-		type(scalarField), intent(in) :: beta
+		type(field), intent(in) :: f
+		type(field), intent(in) :: beta
 		integer :: nx, ny, nz
 		integer :: q
 		
@@ -839,8 +839,8 @@ contains
 
 	subroutine computeDiagBoundaryValues(this,bf,beta,dir,nx,ny,nz) 
 		type(poissMat), intent(inout) :: this
-		type(scalarBoundaryField), intent(in) :: bf
-		type(scalarField), intent(in) :: beta
+		type(boundaryField), intent(in) :: bf
+		type(field), intent(in) :: beta
 		integer, intent(in) :: dir
 		integer, intent(in) :: nx, ny, nz 
 		integer :: i, j, k, n
@@ -976,8 +976,8 @@ contains
 !========================================================================================!
 	subroutine computeOffDiagBoundaryValues(this,bf,beta,dir,nx,ny,nz) 
 		type(poissMat), intent(inout) :: this
-		type(scalarBoundaryField), intent(in) :: bf
-		type(scalarField), intent(in) :: beta
+		type(boundaryField), intent(in) :: bf
+		type(field), intent(in) :: beta
 		integer, intent(in) :: dir
 		integer, intent(in) :: nx, ny, nz 	
 		integer :: i, j, k, n
@@ -1080,7 +1080,7 @@ contains
 !========================================================================================!
 	subroutine computeRHS(this,f,beta,s) 
 		type(poissMat), intent(inout) :: this
-		type(scalarField), intent(in) :: f, beta, s
+		type(field), intent(in) :: f, beta, s
 		integer :: i, j, k, nx, ny, nz
 		real(DP) :: V
 		
@@ -1122,7 +1122,7 @@ contains
 !========================================================================================!
 	subroutine gatherRHS(this,f) 
 		type(poissMat), intent(inout) :: this
-		type(scalarField), intent(in) :: f
+		type(field), intent(in) :: f
 		integer :: i, j, k, nx, ny, nz
 		integer :: nxg, nyg, nzg
 		integer :: i0g, i1g, j0g, j1g, k0g, k1g
@@ -1214,8 +1214,8 @@ contains
 !========================================================================================!
 	subroutine computeBoundarySourceRHS(this,bf,beta,nx,ny,nz) 
 		type(poissMat), intent(inout) :: this
-		type(scalarBoundaryField), intent(in) :: bf
-		type(scalarField), intent(in) :: beta
+		type(boundaryField), intent(in) :: bf
+		type(field), intent(in) :: beta
 		integer, intent(in) :: nx, ny, nz
 		integer :: i, j, k ,n
 		integer :: ie, is, je, js, ke, ks
@@ -1534,7 +1534,7 @@ contains
 !========================================================================================!
 	subroutine checkSingularSystem(this,f) 
 		type(poissMat), intent(inout) :: this
-		type(scalarField), intent(in) :: f
+		type(field), intent(in) :: f
 		type(mpiControl), pointer :: ptrMPIC
 		integer :: i, ig
 		integer :: ierror

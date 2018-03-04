@@ -31,10 +31,10 @@ module gridMod
 
 	type, public :: grid
 
-!DIR$ IF DEFINED (MG_MODE)	
+#ifdef MG_MODE
 		!class pointer for multi-grids
 		type(grid), pointer :: ptrGrid_ => NULL()
-!DIR$ ENDIF	
+#endif	
 	
 		! domain
 		real(DP) :: Lx_, Ly_, Lz_ 
@@ -55,13 +55,13 @@ module gridMod
 		!logical for grid ref 		
 		logical, private, dimension(3) :: isDirUnif_
 	
-		!mesh dictionary
-		type(dictionary), private :: dict_
+		!mesh parFile
+		type(parFile), private :: pfile_
 		
-!DIR$ IF DEFINED (MG_MODE)	
+#ifdef MG_MODE	
 		!multi-grid level		
 		integer :: level_
-!DIR$ ENDIF	
+#endif	
 		
 		!keep a pointer to mpiControl
 		type(mpiControl), pointer :: ptrMPIC_ => NULL()
@@ -104,20 +104,20 @@ module gridMod
 
 	end type
 	
-!DIR$ IF DEFINED (FAST_MODE)
+#ifdef FAST_MODE
 	private :: checkGridSpacing
-!DIR$ ENDIF
+#endif
 	private :: coord_unif_c
 	private :: coord_unif_f
 	private :: coord_hyper_c
 	private :: coord_hyper_f
 	private :: metrics_centroids
 	private :: metrics_faces
-!DIR$ IF DEFINED (MG_MODE)
+#ifdef MG_MODE
 	private :: coarsenGrid
 	private :: allocatePtrGrid
 	private :: deallocatePtrGrid
-!DIR$ ENDIF
+#endif
 	private :: computeGlobalIndexes
 	private :: computeCoordinates
 	private :: computeMetrics
@@ -129,10 +129,10 @@ module gridMod
 	public :: delete_grid
 	public :: decomposeGrid
 	public :: broadCastGlobalGrid
-!DIR$ IF DEFINED (MG_MODE)
+#ifdef MG_MODE
 	public :: coarsenGrids
 	public :: setMgLevels
-!DIR$ ENDIF
+#endif
 	public :: globalIndexesFromAll
 	
 
@@ -144,10 +144,10 @@ contains
     subroutine delete_grid(this)
         type(grid), intent(inout) :: this
 
-!DIR$ IF DEFINED (MG_MODE)	        
+#ifdef MG_MODE        
         !deallocate ptrGrid
         call deallocatePtrGrid(this)
-!DIR$ ENDIF	
+#endif	
         
     end subroutine
 !========================================================================================!
@@ -157,17 +157,17 @@ contains
 		type(grid), intent(out) :: this
 		type(mpiControl), intent(in), target :: mpiCTRL
 
-		call dictionaryCTOR(this%dict_ ,'mesh','specs')
+		call parFileCTOR(this%pfile_ ,'mesh','specs')
 		
 		this%ptrMPIC_ => mpiCTRL
 			
-		call readParameter(this%dict_,this%Lx_,'Lx',bcast=.FALSE.)
-		call readParameter(this%dict_,this%Ly_,'Ly',bcast=.FALSE.)
-		call readParameter(this%dict_,this%Lz_,'Lz',bcast=.FALSE.)
+		call readParameter(this%pfile_,this%Lx_,'Lx',bcast=.FALSE.)
+		call readParameter(this%pfile_,this%Ly_,'Ly',bcast=.FALSE.)
+		call readParameter(this%pfile_,this%Lz_,'Lz',bcast=.FALSE.)
 		
-		call readParameter(this%dict_,this%nx_,'nx',bcast=.FALSE.)
-		call readParameter(this%dict_,this%ny_,'ny',bcast=.FALSE.)
-		call readParameter(this%dict_,this%nz_,'nz',bcast=.FALSE.)
+		call readParameter(this%pfile_,this%nx_,'nx',bcast=.FALSE.)
+		call readParameter(this%pfile_,this%ny_,'ny',bcast=.FALSE.)
+		call readParameter(this%pfile_,this%nz_,'nz',bcast=.FALSE.)
 		
 		!grid halo dim
 		this%hd_=3
@@ -190,12 +190,12 @@ contains
 		this%k1g_ = this%nz_
 
 	
-		call readParameter(this%dict_,this%isDirUnif_(1),'isXunif',bcast=.FALSE.)
-		call readParameter(this%dict_,this%isDirUnif_(2),'isYunif',bcast=.FALSE.)
-		call readParameter(this%dict_,this%isDirUnif_(3),'isZunif',bcast=.FALSE.)
-!DIR$ IF DEFINED (FAST_MODE)
+		call readParameter(this%pfile_,this%isDirUnif_(1),'isXunif',bcast=.FALSE.)
+		call readParameter(this%pfile_,this%isDirUnif_(2),'isYunif',bcast=.FALSE.)
+		call readParameter(this%pfile_,this%isDirUnif_(3),'isZunif',bcast=.FALSE.)
+#ifdef FAST_MODE
 		call checkGridSpacing(this)
-!DIR$ ENDIF
+#endif
 			
 		!init coordinates
 		call computeCoordinates(this)
@@ -411,8 +411,8 @@ contains
         !keep a pointer to mpiCTRL
 		gLoc%ptrMPIC_ => mpiCTRL
 
-		!mesh dictionary
-		call dictionaryCTOR(gLoc%dict_,'mesh','specs')
+		!mesh parFile
+		call parFileCTOR(gLoc%pfile_,'mesh','specs')
 		
 		!mesh geom
 		call MPI_BCAST(this%nx_, 1, MPI_INTEGER, 0, mpiCTRL%cartComm_, ierror)
@@ -484,7 +484,7 @@ contains
     end subroutine
 !========================================================================================!
 
-!DIR$ IF DEFINED (MG_MODE)
+#ifdef MG_MODE
 
 !========================================================================================!
 	subroutine coarsenGrid(this)
@@ -504,7 +504,7 @@ contains
 		this%ptrGrid_%Lyg_ = this%Lyg_
 		this%ptrGrid_%Lzg_ = this%Lzg_	
 		this%ptrGrid_%isDirUnif_ = this%isDirUnif_
-		this%ptrGrid_%dict_ = this%dict_
+		this%ptrGrid_%pfile_ = this%pfile_
 		this%ptrGrid_%ptrMPIC_ => this%ptrMPIC_
 		
 		!new grid size
@@ -609,7 +609,7 @@ contains
 	end subroutine
 !========================================================================================!
 
-!DIR$ ENDIF
+#endif
 
 !========================================================================================!
 	subroutine computeGlobalIndexes(this) 

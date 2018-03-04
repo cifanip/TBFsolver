@@ -18,7 +18,7 @@
 
 module rbgsMod
 	
-	use scalarFieldMod
+	use fieldMod
 	
 	implicit none
 
@@ -83,7 +83,7 @@ contains
 	subroutine rbgsCTOR(this,mesh,p)
 		type(rbgs) :: this
 		type(grid), intent(in), target :: mesh
-		type(scalarField), intent(in) :: p
+		type(field), intent(in) :: p
 		type(mpiControl), pointer :: ptrMPIC
 		integer, dimension(3) :: procCoord
 		integer :: nx, ny, nz
@@ -167,9 +167,9 @@ contains
 !========================================================================================!
 	subroutine solveRBGS(this,p,beta,q,nIter,isToBeReset) 
         type(rbgs), intent(inout) :: this
-        type(scalarField), intent(in) :: beta, q
+        type(field), intent(in) :: beta, q
         integer, intent(in) :: nIter
-        type(scalarField), intent(inout) :: p
+        type(field), intent(inout) :: p
         logical, intent(in) :: isToBeReset
         
         !GS sweeps
@@ -185,9 +185,9 @@ contains
 !========================================================================================!
     subroutine iterateGS(this,p,beta,q,nIter,isToBeReset) 
         type(rbgs), intent(inout) :: this
-        type(scalarField), intent(in) :: beta, q
+        type(field), intent(in) :: beta, q
         integer, intent(in) :: nIter
-        type(scalarField), intent(inout) :: p
+        type(field), intent(inout) :: p
         logical, intent(in) :: isToBeReset
         integer :: i, j, k, n
         real(DP) :: aR, aL, aT, aBo, aF, aBa
@@ -275,8 +275,8 @@ contains
 !========================================================================================!
     subroutine computeResiduals(this,p,beta,q)
         type(rbgs), intent(inout) :: this
-        type(scalarField), intent(in) :: beta, q
-        type(scalarField), intent(in) :: p
+        type(field), intent(in) :: beta, q
+        type(field), intent(in) :: p
         type(mpiControl), pointer :: ptrMPIC
         integer :: i, j, k
         real(DP) :: aR, aL, aT, aBo, aF, aBa
@@ -337,7 +337,7 @@ contains
     recursive subroutine coarsenRbgsSolvers(this,mesh,p,n)
         type(rbgs), intent(inout) :: this
         type(grid), intent(in) :: mesh
-        type(scalarField), intent(in) :: p
+        type(field), intent(in) :: p
         integer, intent(in) :: n
 		
 		if (n > 1) then 
@@ -355,7 +355,7 @@ contains
     subroutine coarsenRbgsSolver(this,mesh,p)
         type(rbgs), intent(inout) :: this
         type(grid), intent(in) :: mesh
-        type(scalarField), intent(in) :: p
+        type(field), intent(in) :: p
 		
 		!allocate pointer
 		call allocatePtrRbgs(this) 
@@ -402,7 +402,7 @@ contains
 !========================================================================================!
     subroutine correctFullNeumann(mesh,p)
         type(grid), intent(in) :: mesh
-        type(scalarField), intent(inout) :: p
+        type(field), intent(inout) :: p
         type(mpiControl), pointer :: ptrMPIC
         real(DP) :: pAvl, pAvg
         integer :: ierror
@@ -449,7 +449,7 @@ contains
 !========================================================================================!
 	subroutine checkSingularSystem(this,f) 
 		type(rbgs), intent(inout) :: this
-		type(scalarField), intent(in) :: f
+		type(field), intent(in) :: f
 		type(mpiControl), pointer :: ptrMPIC
 		integer :: i, ig
 		integer :: ierror

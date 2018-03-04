@@ -25,7 +25,7 @@ module pcgMod
 
 	type, public :: pcg
 	
-		type(scalarField), private :: d_,r_
+		type(field), private :: d_,r_
 		real(DP), allocatable, dimension(:,:,:) :: qV_,d0_
 		!store metrics
 		real(DP), private, allocatable, dimension(:,:) :: invx_, invy_, invz_
@@ -62,27 +62,27 @@ contains
 	subroutine pcgCTOR(this,mesh,psi,beta)
 		type(pcg) :: this
 		type(grid), intent(in) ::  mesh
-		type(scalarField), intent(inout) :: psi,beta
-		type(dictionary) :: dict
+		type(field), intent(inout) :: psi,beta
+		type(parFile) :: pfile
 		integer :: nx,ny,nz
 		
 		nx = mesh%nx_
 		ny = mesh%ny_
 		nz = mesh%nz_
 
-		!init scalarField
-		call scalarFieldCTOR(this%d_,'d',mesh,'cl',psi%hd_,initOpt=-1)
+		!init field
+		call fieldCTOR(this%d_,'d',mesh,'cl',psi%hd_,initOpt=-1)
 		call copyBoundary(this%d_,psi)
 		call resetBCerrorField(this%d_)
-		call scalarFieldCTOR(this%r_,'r',mesh,'cl',psi%hd_,initOpt=-1)
+		call fieldCTOR(this%r_,'r',mesh,'cl',psi%hd_,initOpt=-1)
 		call copyBoundary(this%r_,psi)
 		call resetBCerrorField(this%r_)
 
-		!read form dict
-		call dictionaryCTOR(dict,'pcg_solver','specs')
-		call readParameter(dict,this%tol_,'tolPCG')
-		call readParameter(dict,this%maxIter_,'maxIterPCG')
-		call readParameter(dict,this%fullInfo_,'fullInfoPCG')
+		!read form pfile
+		call parFileCTOR(pfile,'pcg_solver','specs')
+		call readParameter(pfile,this%tol_,'tolPCG')
+		call readParameter(pfile,this%maxIter_,'maxIterPCG')
+		call readParameter(pfile,this%fullInfo_,'fullInfoPCG')
 		
 		!allocate auxiliary vectors
 		call allocateArray(this%qV_,1,nx,1,ny,1,nz)
@@ -103,7 +103,7 @@ contains
 	subroutine solvePCG(this,mesh,psi,beta,q)
 		type(pcg), intent(inout) :: this
 		type(grid), intent(in) :: mesh
-		type(scalarField), intent(inout) :: psi,beta,q
+		type(field), intent(inout) :: psi,beta,q
 		real(DP) :: alpha, deltaN, delta0, gamma
 		integer :: nx,ny,nz
 		
@@ -143,7 +143,7 @@ contains
 !========================================================================================!
 	subroutine computeQv(this,beta,d)
 		type(pcg), intent(inout) :: this
-		type(scalarField), intent(in) :: beta,d
+		type(field), intent(in) :: beta,d
 		integer :: i,j,k,nx,ny,nz
 		real(DP) :: aR,aL,aT,aBo,aF,aBa
 		
@@ -185,7 +185,7 @@ contains
 
 !========================================================================================!
 	subroutine computeAlpha(d,qv,deltaN,alpha)
-		type(scalarField), intent(in) :: d
+		type(field), intent(in) :: d
 		real(DP), allocatable, dimension(:,:,:), intent(in) :: qv
 		real(DP), intent(in) :: deltaN
 		real(DP), intent(out) :: alpha
@@ -226,8 +226,8 @@ contains
 
 !========================================================================================!
 	subroutine updatePsi(psi,d,alpha,isSingular)
-		type(scalarField), intent(inout) :: psi
-		type(scalarField), intent(in) :: d
+		type(field), intent(inout) :: psi
+		type(field), intent(in) :: d
 		real(DP), intent(in) :: alpha
 		logical, intent(in) :: isSingular
 		integer :: is,ie,js,je,ks,ke
@@ -265,7 +265,7 @@ contains
 !========================================================================================!
 	subroutine updateDir(d0,d,gamma)
 		real(DP), allocatable, dimension(:,:,:), intent(inout) :: d0
-		type(scalarField), intent(in) :: d
+		type(field), intent(in) :: d
 		real(DP), intent(in) :: gamma
 		integer :: nx,ny,nz
 		integer :: i,j,k
@@ -292,7 +292,7 @@ contains
 
 !========================================================================================!
 	subroutine updateDeltaN(va,vb,deltaN)
-		type(scalarField), intent(in) :: va,vb
+		type(field), intent(in) :: va,vb
 		real(DP), intent(out) :: deltaN
 		integer :: nx,ny,nz
 		real(DP) :: deltaNl
@@ -329,7 +329,7 @@ contains
 
 !========================================================================================!
 	subroutine updateResidual(r,qv,alpha)
-		type(scalarField), intent(inout) :: r
+		type(field), intent(inout) :: r
 		real(DP), allocatable, dimension(:,:,:), intent(in) :: qv
 		real(DP), intent(in) :: alpha
 		integer :: nx,ny,nz
@@ -358,7 +358,7 @@ contains
 !========================================================================================!
     function continueIterating(this,q) RESULT(isVar)
         type(pcg), intent(inout) :: this
-        type(scalarField), intent(in) :: q
+        type(field), intent(in) :: q
         logical :: isVar
         
         
@@ -406,7 +406,7 @@ contains
 
 !========================================================================================!
 	subroutine scalarResidual(r,q,res)
-		type(scalarField), intent(in) :: r,q
+		type(field), intent(in) :: r,q
 		real(DP), intent(out) :: res
 		integer :: nx,ny,nz
 		integer :: comm, ierror

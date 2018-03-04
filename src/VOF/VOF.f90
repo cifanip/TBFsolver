@@ -165,7 +165,6 @@ module VOFMod
 	private :: computeBlockCurvature
 	private :: hfColumn
 	private :: hfCurvature
-	private :: searchBlockHF
 	private :: independentPoints
 	private :: localIntPos
 	private :: buildLSqSystem
@@ -202,7 +201,7 @@ contains
         type(time), intent(in), target :: rt
         type(grid), intent(in), target :: gmesh, mesh
         integer :: nprocs
-        type(dictionary) :: dict
+        type(parFile) :: pfile
         integer :: nx,ny,nz
         
         this%ptrTime_ => rt
@@ -216,12 +215,12 @@ contains
 		this%hd_ = 3
 		
 		!read mat props
-		call dictionaryCTOR(dict ,'parameters','specs')
-		call readParameter(dict,this%rhol_,'rhol')
-		call readParameter(dict,this%rhog_,'rhog')
-		call readParameter(dict,this%mul_,'mul')
-		call readParameter(dict,this%mug_,'mug')
-		call readParameter(dict,this%sigma_,'sigma')
+		call parFileCTOR(pfile ,'parameters','specs')
+		call readParameter(pfile,this%rhol_,'rhol')
+		call readParameter(pfile,this%rhog_,'rhog')
+		call readParameter(pfile,this%mul_,'mul')
+		call readParameter(pfile,this%mug_,'mug')
+		call readParameter(pfile,this%sigma_,'sigma')
 
 		!init blocks
 		call initVOFblocks(mesh,gmesh)
@@ -259,8 +258,8 @@ contains
 !========================================================================================!
     subroutine solveVOF(this,c,u)
     	type(VOF), intent(inout) :: this
-    	type(scalarField), intent(inout) :: c
-    	type(vectorField), intent(in) :: u
+    	type(field), intent(inout) :: c
+    	type(vfield), intent(in) :: u
     	integer :: i,b
     	real(DP) :: start, finish
     	
@@ -1043,17 +1042,17 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-    subroutine readSingleBubble(mesh,dict)
+    subroutine readSingleBubble(mesh,pfile)
     	type(grid), intent(in) :: mesh
-		type(dictionary), intent(in) :: dict
+		type(parFile), intent(in) :: pfile
 		integer :: nref
 		real(DP) :: x0,y0,z0,R
 		
-		call readParameter(dict,nref,'nref',bcast=.FALSE.)
-		call readParameter(dict,x0,'x0',bcast=.FALSE.)
-		call readParameter(dict,y0,'y0',bcast=.FALSE.)
-		call readParameter(dict,z0,'z0',bcast=.FALSE.)
-		call readParameter(dict,R,'R',bcast=.FALSE.)
+		call readParameter(pfile,nref,'nref',bcast=.FALSE.)
+		call readParameter(pfile,x0,'x0',bcast=.FALSE.)
+		call readParameter(pfile,y0,'y0',bcast=.FALSE.)
+		call readParameter(pfile,z0,'z0',bcast=.FALSE.)
+		call readParameter(pfile,R,'R',bcast=.FALSE.)
 					
 		!set static bubble number
 		s_nb = 1
@@ -1074,24 +1073,24 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-    subroutine readTwoBubbles(mesh,dict)
+    subroutine readTwoBubbles(mesh,pfile)
     	type(grid), intent(in) :: mesh
-		type(dictionary), intent(in) :: dict
+		type(parFile), intent(in) :: pfile
 		integer :: nref
 		real(DP) :: x0_b1,y0_b1,z0_b1,R_b1
 		real(DP) :: x0_b2,y0_b2,z0_b2,R_b2
 		
-		call readParameter(dict,nref,'nref',bcast=.FALSE.)
+		call readParameter(pfile,nref,'nref',bcast=.FALSE.)
 		!b1
-		call readParameter(dict,x0_b1,'x0_b1',bcast=.FALSE.)
-		call readParameter(dict,y0_b1,'y0_b1',bcast=.FALSE.)
-		call readParameter(dict,z0_b1,'z0_b1',bcast=.FALSE.)
-		call readParameter(dict,R_b1,'R_b1',bcast=.FALSE.)
+		call readParameter(pfile,x0_b1,'x0_b1',bcast=.FALSE.)
+		call readParameter(pfile,y0_b1,'y0_b1',bcast=.FALSE.)
+		call readParameter(pfile,z0_b1,'z0_b1',bcast=.FALSE.)
+		call readParameter(pfile,R_b1,'R_b1',bcast=.FALSE.)
 		!b2
-		call readParameter(dict,x0_b2,'x0_b2',bcast=.FALSE.)
-		call readParameter(dict,y0_b2,'y0_b2',bcast=.FALSE.)
-		call readParameter(dict,z0_b2,'z0_b2',bcast=.FALSE.)
-		call readParameter(dict,R_b2,'R_b2',bcast=.FALSE.)
+		call readParameter(pfile,x0_b2,'x0_b2',bcast=.FALSE.)
+		call readParameter(pfile,y0_b2,'y0_b2',bcast=.FALSE.)
+		call readParameter(pfile,z0_b2,'z0_b2',bcast=.FALSE.)
+		call readParameter(pfile,R_b2,'R_b2',bcast=.FALSE.)
 					
 		!set static bubble number
 		s_nb = 2
@@ -1121,9 +1120,9 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-    subroutine readBubblesArray(mesh,dict)
+    subroutine readBubblesArray(mesh,pfile)
     	type(grid), intent(in) :: mesh
-		type(dictionary), intent(in) :: dict
+		type(parFile), intent(in) :: pfile
 		integer :: nbx,nby,nbz,nref
 		real(DP) :: Lx,Ly,Lz,R,dx,dy,dz,dxb,dyb,dzb
 		real(DP) :: sx,sy,sz,x0,y0,z0,sx_eps,sy_eps,sz_eps
@@ -1144,12 +1143,12 @@ contains
 		dy = Ly/ny
 		dz = Lz/nz
 		
-		call readParameter(dict,nbx,'nbx',bcast=.FALSE.)
-		call readParameter(dict,nby,'nby',bcast=.FALSE.)
-		call readParameter(dict,nbz,'nbz',bcast=.FALSE.)
-		call readParameter(dict,nref,'nref',bcast=.FALSE.)
-		call readParameter(dict,R,'R',bcast=.FALSE.)
-		call readParameter(dict,random_distr,'random_distr',bcast=.FALSE.)
+		call readParameter(pfile,nbx,'nbx',bcast=.FALSE.)
+		call readParameter(pfile,nby,'nby',bcast=.FALSE.)
+		call readParameter(pfile,nbz,'nbz',bcast=.FALSE.)
+		call readParameter(pfile,nref,'nref',bcast=.FALSE.)
+		call readParameter(pfile,R,'R',bcast=.FALSE.)
+		call readParameter(pfile,random_distr,'random_distr',bcast=.FALSE.)
 
 		!bubble displacement 
 		dxb = Lx/nbx
@@ -1429,7 +1428,7 @@ contains
     	integer, parameter :: single_bubbles = 1, array_bubbles = 2, two_bubbles=3
     	real(DP), allocatable, dimension(:,:,:) :: cblk
     	logical, allocatable, dimension(:) :: b_proc_bool
-    	type(dictionary) :: dict
+    	type(parFile) :: pfile
     	integer :: method,nref,ierror,bi,is,js,ks,ie,je,ke,nb_tmp,n_blk_max
     	real(DP) :: x0,y0,z0,R
     	logical :: present
@@ -1444,18 +1443,18 @@ contains
 
 		if (IS_MASTER) then		
 		
-			call dictionaryCTOR(dict,'initBubbles','specs')
-			call readParameter(dict,method,'method',bcast=.FALSE.)
+			call parFileCTOR(pfile,'initBubbles','specs')
+			call readParameter(pfile,method,'method',bcast=.FALSE.)
 			!number of refinements
-			call readParameter(dict,nref,'nref',bcast=.FALSE.)
+			call readParameter(pfile,nref,'nref',bcast=.FALSE.)
 		
 			select case(method)
 				case(single_bubbles)
-					call readSingleBubble(gmesh,dict)
+					call readSingleBubble(gmesh,pfile)
 				case(array_bubbles)
-					call readBubblesArray(gmesh,dict)
+					call readBubblesArray(gmesh,pfile)
 				case(two_bubbles)
-					call readTwoBubbles(gmesh,dict)
+					call readTwoBubbles(gmesh,pfile)
 				case default
 			end select
 		
@@ -2136,7 +2135,7 @@ contains
 !========================================================================================!
     subroutine excVel(mesh,u)
     	type(grid), intent(in) :: mesh
-    	type(vectorField), intent(in) :: u
+    	type(vfield), intent(in) :: u
     	type(mpiControl), pointer :: mpic
 		integer :: nprocs,b,master,slave,n,bl
 		integer :: i0g,j0g,k0g,i1g,j1g,k1g,nxg,nyg,nzg
@@ -2369,7 +2368,7 @@ contains
 !========================================================================================!
     subroutine excVFK(mesh,c,ftype)
     	type(grid), intent(in) :: mesh
-    	type(scalarField), intent(inout) :: c
+    	type(field), intent(inout) :: c
     	integer, intent(in) :: ftype
     	type(mpiControl), pointer :: mpic
 		integer :: nprocs,b,master,slave,n,bl
@@ -2503,7 +2502,7 @@ contains
 !========================================================================================!
     subroutine excST(mesh,st)
     	type(grid), intent(in) :: mesh
-    	type(vectorField), intent(inout) :: st
+    	type(vfield), intent(inout) :: st
     	type(mpiControl), pointer :: mpic
 		integer :: nprocs,b,master,slave,n,bl
 		integer :: i0g,j0g,k0g,i1g,j1g,k1g
@@ -3962,8 +3961,8 @@ contains
 !========================================================================================!
     subroutine updateMaterialProps(this,c,cs,rho,mu)
     	type(VOF), intent(in) :: this
-    	type(scalarField), intent(in) :: c
-    	type(scalarField), intent(inout) :: cs,rho,mu
+    	type(field), intent(in) :: c
+    	type(field), intent(inout) :: cs,rho,mu
         integer :: lbi, ubi, lbj, ubj, lbk, ubk
         integer :: i,j,k
        
@@ -4207,7 +4206,7 @@ contains
 						!chiama procedura colonna
 						call setStencilPar(mloc,d)
 						do cn=1,9
-							call hfColumn(this,vofb,mmax,mloc,i+d(1,cn),j+d(2,cn),k+d(3,cn),cn,h,lb,pos_hf,isValid)
+							call hfColumn(vofb,mmax,mloc,i+d(1,cn),j+d(2,cn),k+d(3,cn),cn,h,lb,pos_hf,isValid)
 							if (.NOT. (isValid(cn))) then
 								hfk = .FALSE.
 								!goto 100
@@ -4355,8 +4354,8 @@ contains
 !========================================================================================!
     subroutine smoothVF(this,c,cs)
         type(VOF), intent(in) :: this
-        type(scalarField), intent(in) :: c
-        type(scalarField), intent(inout) :: cs
+        type(field), intent(in) :: c
+        type(field), intent(inout) :: cs
         
         !step 1
         call cellToVertex(c%f_,s_cv,							        &	
@@ -4451,8 +4450,8 @@ contains
 !========================================================================================!
     subroutine computeSurfaceTension(this,st,k)
     	type(VOF), intent(in) :: this
-    	type(vectorField), intent(inout) :: st
-    	type(scalarField), intent(inout) :: k
+    	type(vfield), intent(inout) :: st
+    	type(field), intent(inout) :: k
     	integer :: b
     	real(DP) :: t_S, t_E
     	
@@ -4581,14 +4580,14 @@ contains
 !========================================================================================!
     subroutine computeCurvature(this,k)
     	type(VOF), intent(in) :: this
-    	type(scalarField), intent(inout) :: k
+    	type(field), intent(inout) :: k
     	integer :: b
 
 		!$OMP PARALLEL DO DEFAULT(none) &
-		!$OMP SHARED(vofBlocks,this,s_nblk) &
+		!$OMP SHARED(vofBlocks,s_nblk) &
 		!$OMP PRIVATE(b)    	
     	do b=1,s_nblk
-    		call computeBlockCurvature(this,vofBlocks(b))
+    		call computeBlockCurvature(vofBlocks(b))
     		!call spreadCurvature(vofBlocks(b))
     	end do
     	!$OMP END PARALLEL DO
@@ -4647,13 +4646,12 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-    subroutine computeBlockCurvature(this,vofb)
-        type(VOF), intent(in) :: this
+    subroutine computeBlockCurvature(vofb)
         type(vofBlock), intent(inout) :: vofb
         integer :: i, j, k
         real(DP) :: mx, my, mz
-        real(DP) :: mmax
-        integer :: mloc
+        real(DP) :: m_1,m_2,m_3,small
+        integer :: mloc_1,mloc_2,mloc_3
         real(DP), dimension(3) :: mv
         real(DP), dimension(9) :: h
         integer, dimension(9) :: lb
@@ -4673,13 +4671,13 @@ contains
 		lbk = lbound(vofb%k,3)
 		ubk = ubound(vofb%k,3)
 
+
 		do k=lbk,ubk
 			do j=lbj,ubj
 				do i=lbi,ubi
 				
 					!reset curvature
 					vofb%k(i,j,k) = 0.d0
-					hfk = .TRUE.
 				
 					if (vofb%isMixed(i,j,k)) then
 					
@@ -4688,33 +4686,78 @@ contains
 					mz = vofb%nz(i,j,k)
 					
 					mv = (/ mx, my, mz /)
-					mloc = maxloc( abs(mv),1 )
-					mmax = mv(mloc)
+					small=tiny(1.d0)
+					!sort
+					mloc_1 = maxloc( abs(mv),1 )
+					m_1 = mv(mloc_1)
+					mv(mloc_1)=small
+					mloc_2 = maxloc( abs(mv),1 )
+					m_2 = mv(mloc_2)
+					mv(mloc_2)=small
+					mloc_3 = maxloc( abs(mv),1 )
+					m_3 = mv(mloc_3)
 					
-					!chiama procedura colonna
-					call setStencilPar(mloc,d)
+					!search dir 1
+					call setStencilPar(mloc_1,d)
+					hfk = .TRUE.
 					do cn=1,9
-						call hfColumn(this,vofb,mmax,mloc,i+d(1,cn),j+d(2,cn),k+d(3,cn),cn,h,lb,pos_hf,isValid)
+						call hfColumn(vofb,m_1,mloc_1,i+d(1,cn),j+d(2,cn),k+d(3,cn),cn,h,lb,pos_hf,isValid)
 						if (.NOT. (isValid(cn))) then
 							hfk = .FALSE.
 						end if						
-					end do
-				
-					!compute curvature	
+					end do	
+					isBlockValid(1:9)=isValid
+					pos_block(:,1:9)=pos_hf		
 					if (hfk) then
-						call hfCurvature(vofb,mloc,mmax,i,j,k,h,lb)		
-					else
-						call searchBlockHF(this,vofb,i,j,k,mv,mloc,isValid,pos_hf,isBlockValid,pos_block)
-						call parabFittedCurvature(vofb,i,j,k,pos_block,isBlockValid,.TRUE.,failed)	
-						if (failed) then
-							call interCentroids(vofb,i,j,k,pos_block,isBlockValid)
-							call parabFittedCurvature(vofb,i,j,k,pos_block,isBlockValid,.FALSE.,failed)	
-						end if		
-					!	call fdCurvature(vofb,i,j,k)			
-					end if		
-
-	
+						call hfCurvature(vofb,mloc_1,m_1,i,j,k,h,lb)	
+						cycle	
+					end if	
+					
+					!search dir 2
+					call setStencilPar(mloc_2,d)
+					hfk = .TRUE.
+					do cn=1,9
+						call hfColumn(vofb,m_2,mloc_2,i+d(1,cn),j+d(2,cn),k+d(3,cn),cn,h,lb,pos_hf,isValid)
+						if (.NOT. (isValid(cn))) then
+							hfk = .FALSE.
+						end if						
+					end do	
+					isBlockValid(10:18)=isValid
+					pos_block(:,10:18)=pos_hf	
+					if (hfk) then
+						call hfCurvature(vofb,mloc_2,m_2,i,j,k,h,lb)
+						cycle	
 					end if
+					
+					!search dir 3
+					call setStencilPar(mloc_3,d)
+					hfk = .TRUE.
+					do cn=1,9
+						call hfColumn(vofb,m_3,mloc_3,i+d(1,cn),j+d(2,cn),k+d(3,cn),cn,h,lb,pos_hf,isValid)
+						if (.NOT. (isValid(cn))) then
+							hfk = .FALSE.
+						end if						
+					end do	
+					isBlockValid(19:27)=isValid
+					pos_block(:,19:27)=pos_hf	
+					if (hfk) then
+						call hfCurvature(vofb,mloc_3,m_3,i,j,k,h,lb)	
+						cycle	
+					end if						
+
+					!standard HF failed (execute parabolic fit)
+					
+					call parabFittedCurvature(vofb,i,j,k,pos_block,isBlockValid,.TRUE.,failed)	
+					
+					if (failed) then
+						call interCentroids(vofb,i,j,k,pos_block,isBlockValid)
+						call parabFittedCurvature(vofb,i,j,k,pos_block,isBlockValid,.FALSE.,failed)						
+					end if
+							
+					!	call fdCurvature(vofb,i,j,k)	
+						
+					end if
+	
 					
 				end do
 			end do
@@ -4725,8 +4768,7 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-    subroutine hfColumn(this,vofb,m,dir,i,j,k,cn,h,lb,posi,isValid)
-    	type(VOF), intent(in) :: this
+    subroutine hfColumn(vofb,m,dir,i,j,k,cn,h,lb,posi,isValid)
         type(vofBlock), intent(in) :: vofb
         real(DP),intent(in) :: m
         integer, intent(in) :: dir, i, j ,k, cn
@@ -4735,7 +4777,8 @@ contains
         logical, dimension(9), intent(inout) :: isValid
         real(DP), dimension(3,9), intent(inout) :: posi
         integer :: swi,swj,swk,it,jt,kt,ib,jb,kb
-        integer :: ii, jj, kk, l
+        integer :: ii, jj, kk, l, idx_lb, idx_ub
+        logical :: search,isEmpty,isMixed,isFull
         real(DP), pointer, dimension(:) :: df => NULL()
         real(DP), pointer, dimension(:) :: posf => NULL()
         !$omp threadprivate(df,posf)
@@ -4748,67 +4791,155 @@ contains
 			case(1)
 				df => vofb%dxf
 				posf => vofb%xf
+				idx_ub=vofb%idx(2)
+				idx_lb=vofb%idx(1)
 			case(2)
 				df => vofb%dyf
 				posf => vofb%yf
+				idx_ub=vofb%idx(4)
+				idx_lb=vofb%idx(3)
 			case(3)
 				df => vofb%dzf
 				posf => vofb%zf
+				idx_ub=vofb%idx(6)
+				idx_lb=vofb%idx(5)
 			case default
 		end select
 		
 		h(cn) = vofb%c(i,j,k)*df(swi*i+swj*j+swk*k)
 		
 		!search the top column
-		isValid(cn) = .FALSE.
-		do l=1,this%hd_
+		isEmpty=((.NOT.(vofb%isFull(i,j,k))).AND.&
+				 (.NOT.(vofb%isMixed(i,j,k))))
+		isMixed=vofb%isMixed(i,j,k)
+		isFull=vofb%isFull(i,j,k)
+		if (.not.isFull) then
+			search=.FALSE.
+		else
+			search=.TRUE.
+		end if
+		l=1
+		do while (search.OR.isMixed)
 			ii = i+l*it
 			jj = j+l*jt
 			kk = k+l*kt
 			h(cn) = h(cn) + vofb%c(ii,jj,kk)*df(swi*ii+swj*jj+swk*kk)
 			
-			if ((.NOT. (vofb%isFull(ii,jj,kk))) .AND. (.NOT. (vofb%isMixed(ii,jj,kk)))) then
-				isValid(cn) = .TRUE.
-				exit
+			if (vofb%isMixed(ii,jj,kk)) then
+				search=.FALSE.
+				isMixed=.TRUE.
+			else
+				isMixed=.FALSE.
 			end if
 			
+			isEmpty=((.NOT.(vofb%isFull(ii,jj,kk))).AND.&
+				     (.NOT.(vofb%isMixed(ii,jj,kk))))
+			l=l+1
+			
+			select case(dir)
+				case(1)
+					if ((ii>idx_ub).OR.(ii<idx_lb)) then
+						isValid(cn) =.FALSE.
+						posi(:,cn)=0.d0
+						return							
+					end if
+				case(2)
+					if ((jj>idx_ub).OR.(jj<idx_lb)) then
+						isValid(cn) =.FALSE.
+						posi(:,cn)=0.d0
+						return							
+					end if
+				case(3)
+					if ((kk>idx_ub).OR.(kk<idx_lb)) then
+						isValid(cn) =.FALSE.
+						posi(:,cn)=0.d0
+						return							
+					end if
+				case default
+			end select
+			
 		end do
-		
-		if (.NOT. (isValid(cn))) then
+
+		if (isEmpty) then
+			isValid(cn) = .TRUE.
+		else
+			isValid(cn) =.FALSE.
 			posi(:,cn)=0.d0
-			return;
+			return		
 		end if
 		
+
 		!search the bottom column
-		isValid(cn) = .FALSE.
-		do l=1,this%hd_
+		isEmpty=((.NOT.(vofb%isFull(i,j,k))).AND.&
+				 (.NOT.(vofb%isMixed(i,j,k))))
+		isMixed=vofb%isMixed(i,j,k)
+		isFull=vofb%isFull(i,j,k)
+		if (.not.isEmpty) then
+			search=.FALSE.
+		else
+			search=.TRUE.
+		end if
+		l=1
+		do while (search.OR.isMixed)
 			ii = i+l*ib
 			jj = j+l*jb
 			kk = k+l*kb
 			h(cn) = h(cn) + vofb%c(ii,jj,kk)*df(swi*ii+swj*jj+swk*kk)
 			
-			if (vofb%isFull(ii,jj,kk)) then
-				isValid(cn) = .TRUE.
-				lb(cn) = l
-				exit
+			if (vofb%isMixed(ii,jj,kk)) then
+				search=.FALSE.
+				isMixed=.TRUE.
+			else
+				isMixed=.FALSE.
 			end if
 			
+			isFull=vofb%isFull(ii,jj,kk)
+			
+			l=l+1
+				
+			select case(dir)
+				case(1)
+					if ((ii>idx_ub).OR.(ii<idx_lb)) then
+						isValid(cn) =.FALSE.
+						posi(:,cn)=0.d0
+						return							
+					end if
+				case(2)
+					if ((jj>idx_ub).OR.(jj<idx_lb)) then
+						isValid(cn) =.FALSE.
+						posi(:,cn)=0.d0
+						return							
+					end if
+				case(3)
+					if ((kk>idx_ub).OR.(kk<idx_lb)) then
+						isValid(cn) =.FALSE.
+						posi(:,cn)=0.d0
+						return							
+					end if
+				case default
+			end select
+
 		end do
 		
-		if (isValid(cn)) then
-			!store interface position
-			posi(1,cn)=vofb%xc(i)
-			posi(2,cn)=vofb%yc(j)
-			posi(3,cn)=vofb%zc(k)
-			if (m >= 0.d0) then
-				posi(dir,cn)=posf(swi*i+swj*j+swk*k-lb(cn)-1)+h(cn)
-			else
-				posi(dir,cn)=posf(swi*i+swj*j+swk*k+lb(cn))-h(cn)
-			end if
+		if (isFull) then
+			isValid(cn) = .TRUE.
+			lb(cn) = l-1
 		else
+			isValid(cn) =.FALSE.
 			posi(:,cn)=0.d0
+			return		
 		end if
-		
+
+		!store interface position
+		posi(1,cn)=vofb%xc(i)
+		posi(2,cn)=vofb%yc(j)
+		posi(3,cn)=vofb%zc(k)
+		if (m >= 0.d0) then
+			posi(dir,cn)=posf(swi*i+swj*j+swk*k-lb(cn)-1)+h(cn)
+		else
+			posi(dir,cn)=posf(swi*i+swj*j+swk*k+lb(cn))-h(cn)
+		end if
+
     end subroutine
 !========================================================================================!
 
@@ -4895,67 +5026,6 @@ contains
 		denom = (1.d0+dhx*dhx+dhy*dhy)*sqrt(1.d0+dhx*dhx+dhy*dhy)
 		vofb%k(i,j,k) = -num/denom
 
-		
-    end subroutine
-!========================================================================================!
-
-!========================================================================================!
-    subroutine searchBlockHF(this,vofb,i,j,k,m,mloc,isValid,pos_hf,isBlockValid,pos_block)
-    	type(VOF), intent(in) :: this
-    	type(vofBlock), intent(in) :: vofb
-    	integer, intent(in) :: i,j,k
-    	real(DP), dimension(3), intent(in) :: m
-    	integer, intent(in) :: mloc
-    	real(DP), dimension(3,9), intent(inout) :: pos_hf
-    	logical, dimension(9), intent(inout) :: isValid
-    	logical, dimension(27), intent(out) :: isBlockValid
-    	real(DP), dimension(3,27), intent(out) :: pos_block
-    	integer, dimension(3,9) :: d
-    	integer :: cn,mloc_2,mloc_3
-        real(DP), dimension(9) :: h
-        integer, dimension(9) :: lb
-        real(DP) :: m_2,m_3
-		
-
-		!store search dir 1
-		isBlockValid(1:9)=isValid
-		pos_block(:,1:9)=pos_hf
-		
-		select case(mloc)
-			case(1)
-				mloc_2=2
-				m_2=m(2)
-				mloc_3=3
-				m_3=m(3)
-			case(2)
-				mloc_2=1
-				m_2=m(1)
-				mloc_3=3
-				m_3=m(3)
-			case(3)
-				mloc_2=1
-				m_2=m(1)
-				mloc_3=2
-				m_3=m(2)
-			case default
-		end select		
-		
-		!search dir 2
-		call setStencilPar(mloc_2,d)
-		do cn=1,9
-			call hfColumn(this,vofb,m_2,mloc_2,i+d(1,cn),j+d(2,cn),k+d(3,cn),cn,h,lb,pos_hf,isValid)
-		end do	
-		isBlockValid(10:18)=isValid
-		pos_block(:,10:18)=pos_hf			
-		
-		!search dir 3
-		call setStencilPar(mloc_3,d)
-		do cn=1,9
-			call hfColumn(this,vofb,m_3,mloc_3,i+d(1,cn),j+d(2,cn),k+d(3,cn),cn,h,lb,pos_hf,isValid)
-		end do	
-		isBlockValid(19:27)=isValid
-		pos_block(:,19:27)=pos_hf		
-		
 		
     end subroutine
 !========================================================================================!

@@ -23,7 +23,7 @@ module momentumEqnMod
 	implicit none
 	
 	!storage old fluxes for AB2 scheme
-	type(vectorField) :: gPhi0, phi0
+	type(vfield) :: gPhi0, phi0
 
 
 	type, public :: momentumEqn
@@ -43,7 +43,7 @@ module momentumEqnMod
 		integer :: isy_, iey_, jsy_, jey_, ksy_, key_
 		integer :: isz_, iez_, jsz_, jez_, ksz_, kez_
 		
-		!convection scheme dictionary
+		!convection scheme parFile
 		real(DP) :: k_
 		
 		!keep a pointer to time
@@ -70,9 +70,9 @@ module momentumEqnMod
 	private :: copyOldFluxes
 	private :: info
 	private :: initOldTimeFlux
-!DIR$ IF DEFINED (FAST_MODE)	
+#ifdef FAST_MODE	
 	private :: computeOldPressGrad
-!DIR$ ENDIF
+#endif
 	
 	public :: momentumEqnCTOR
 	public :: makeVelocityDivFree
@@ -88,16 +88,16 @@ contains
 	subroutine momentumEqnCTOR(this,gMesh,mesh,u,rt)
 		type(momentumEqn) :: this
 		type(grid), intent(in), target :: gMesh,mesh
-        type(vectorField), intent(in) :: u
+        type(vfield), intent(in) :: u
         type(time), intent(in), target :: rt
-        type(dictionary) :: dict_conv, dict_flow, dict_g
+        type(parFile) :: pfile_conv, pfile_flow, pfile_g
         
-        call dictionaryCTOR(dict_conv,'schemes','specs')
+        call parFileCTOR(pfile_conv,'schemes','specs')
         !read k convection scheme parameter
-        call readParameter(dict_conv,this%k_,'k')
+        call readParameter(pfile_conv,this%k_,'k')
         
-        call dictionaryCTOR(dict_flow,'flowControl','specs')
-        call readParameter(dict_flow,this%flowCtrl_,'flowCtrl')
+        call parFileCTOR(pfile_flow,'flowControl','specs')
+        call readParameter(pfile_flow,this%flowCtrl_,'flowCtrl')
 
 		this%ptrMesh_ => mesh
 		this%ptrTime_ => rt
@@ -126,9 +126,9 @@ contains
         end if
         
         !read gravity
-		call dictionaryCTOR(dict_g,'parameters','specs')
-        call readParameter(dict_g,this%g_,'g')
-        call readParameter(dict_g,this%gCH_,'gCH')
+		call parFileCTOR(pfile_g,'parameters','specs')
+        call readParameter(pfile_g,this%g_,'g')
+        call readParameter(pfile_g,this%gCH_,'gCH')
         
         !init u0 if AB2
         call initOldTimeFlux(this,gMesh,mesh,rt)
@@ -139,9 +139,9 @@ contains
 !========================================================================================!
     subroutine solveMomentumEqn(this,u,p,mu,rho,st,c)
     	type(momentumEqn), intent(inout) :: this
-    	type(vectorField), intent(inout) :: u
-    	type(scalarField), intent(in) :: p, mu, rho, c
-    	type(vectorField), intent(in) :: st
+    	type(vfield), intent(inout) :: u
+    	type(field), intent(in) :: p, mu, rho, c
+    	type(vfield), intent(in) :: st
     	real(DP) :: start, finish
     	
 
@@ -178,8 +178,8 @@ contains
 !========================================================================================!
     subroutine updateConveDiff(this,u,mu,rho)
     	type(momentumEqn), intent(inout) :: this
-    	type(vectorField), intent(in) :: u
-    	type(scalarField), intent(in) :: mu, rho
+    	type(vfield), intent(in) :: u
+    	type(field), intent(in) :: mu, rho
     	integer :: im, imm, jm, jmm, km, kmm
     	integer :: ip, ipp, jp, jpp, kp, kpp
     	real(DP) :: qp, Ap, Bp, Fp
@@ -338,14 +338,14 @@ contains
 					
 							!***********************  convection  ***********************!
 							!d (uv) / dx
-							qp = 0.5d0*(u%ux_%f_(i,jp,k)*mesh%dyf_(jp)+ &
-							            u%ux_%f_(i,j,k)*mesh%dyf_(j))/mesh%dyc_(jp)
+							qp = 0.5d0*(u%ux_%f_(i,jp,k)*this%ptrMesh_%dyf_(jp)+ &
+							            u%ux_%f_(i,j,k)*this%ptrMesh_%dyf_(j))/this%ptrMesh_%dyc_(jp)
 							Ap = r*(-u%uy_%f_(im,j,k)+2.d0*u%uy_%f_(i,j,k)-u%uy_%f_(ip,j,k))
 							Bp = r*(-u%uy_%f_(i,j,k)+2.d0*u%uy_%f_(ip,j,k)-u%uy_%f_(ipp,j,k))
 							Fp = qp*0.5d0*(u%uy_%f_(i,j,k)+u%uy_%f_(ip,j,k)) + max(qp,0.d0)*Ap + min(qp,0.d0)*Bp
 					
-							qm = 0.5d0*(u%ux_%f_(im,jp,k)*mesh%dyf_(jp)+ &
-							            u%ux_%f_(im,j,k)*mesh%dyf_(j))/mesh%dyc_(jp)
+							qm = 0.5d0*(u%ux_%f_(im,jp,k)*this%ptrMesh_%dyf_(jp)+ &
+							            u%ux_%f_(im,j,k)*this%ptrMesh_%dyf_(j))/this%ptrMesh_%dyc_(jp)
 							Am = r*(-u%uy_%f_(imm,j,k)+2.d0*u%uy_%f_(im,j,k)-u%uy_%f_(i,j,k))
 							Bm = r*(-u%uy_%f_(im,j,k)+2.d0*u%uy_%f_(i,j,k)-u%uy_%f_(ip,j,k))
 							Fm = qm*0.5d0*(u%uy_%f_(i,j,k)+u%uy_%f_(im,j,k)) + max(qm,0.d0)*Ap + min(qm,0.d0)*Bp
@@ -366,14 +366,14 @@ contains
 							this%phiY_(i,j,k) = this%phiY_(i,j,k) - (Fp-Fm)/this%ptrMesh_%dyc_(jp)
 					
 							!d (wv) / dz
-							qp = 0.5d0*(u%uz_%f_(i,jp,k)*mesh%dyf_(jp)+ &
-									    u%uz_%f_(i,j,k)*mesh%dyf_(j))/mesh%dyc_(jp)	
+							qp = 0.5d0*(u%uz_%f_(i,jp,k)*this%ptrMesh_%dyf_(jp)+ &
+									    u%uz_%f_(i,j,k)*this%ptrMesh_%dyf_(j))/this%ptrMesh_%dyc_(jp)
 							Ap = r*(-u%uy_%f_(i,j,km)+2.d0*u%uy_%f_(i,j,k)-u%uy_%f_(i,j,kp))
 							Bp = r*(-u%uy_%f_(i,j,k)+2.d0*u%uy_%f_(i,j,kp)-u%uy_%f_(i,j,kpp))
 							Fp = qp*0.5d0*(u%uy_%f_(i,j,k)+u%uy_%f_(i,j,kp)) + max(qp,0.d0)*Ap + min(qp,0.d0)*Bp
 					
-							qm = 0.5d0*(u%uz_%f_(i,jp,km)*mesh%dyf_(jp)+ &
-									    u%uz_%f_(i,j,km)*mesh%dyf_(j))/mesh%dyc_(jp)
+							qm = 0.5d0*(u%uz_%f_(i,jp,km)*this%ptrMesh_%dyf_(jp)+ &
+									    u%uz_%f_(i,j,km)*this%ptrMesh_%dyf_(j))/this%ptrMesh_%dyc_(jp)
 							Am = r*(-u%uy_%f_(i,j,kmm)+2.d0*u%uy_%f_(i,j,km)-u%uy_%f_(i,j,k))
 							Bm = r*(-u%uy_%f_(i,j,km)+2.d0*u%uy_%f_(i,j,k)-u%uy_%f_(i,j,kp))
 							Fm = qm*0.5d0*(u%uy_%f_(i,j,k)+u%uy_%f_(i,j,km)) + max(qm,0.d0)*Ap + min(qm,0.d0)*Bp
@@ -534,7 +534,7 @@ contains
 !========================================================================================!
     subroutine addConvDiff(this,u)
     	type(momentumEqn), intent(in) :: this
-    	type(vectorField), intent(inout) :: u 
+    	type(vfield), intent(inout) :: u 
     	real(DP) :: dt, gamma, xi, alpha
     	integer :: i,j,k
     	
@@ -591,8 +591,8 @@ contains
 !========================================================================================!
     subroutine addPressureGrad(this,u,p,rho)
     	type(momentumEqn), intent(in) :: this
-    	type(vectorField), intent(inout) :: u
-    	type(scalarField), intent(in) :: p, rho
+    	type(vfield), intent(inout) :: u
+    	type(field), intent(in) :: p, rho
     	real(DP) :: dt, alpha
     	real(DP) :: invrho
     	integer :: i, j, k
@@ -670,9 +670,9 @@ contains
 !========================================================================================!
     subroutine addSource(this,u,rho,st,c)
     	type(momentumEqn), intent(in) :: this
-    	type(vectorField), intent(inout) :: u
-    	type(scalarField), intent(in) :: rho, c
-    	type(vectorField), intent(in) :: st
+    	type(vfield), intent(inout) :: u
+    	type(field), intent(in) :: rho, c
+    	type(vfield), intent(in) :: st
     	type(grid), pointer :: mesh
     	real(DP) :: dt, alpha
     	real(DP) :: invrho,r
@@ -749,11 +749,12 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-!DIR$ IF DEFINED (MG_MODE)
+#ifdef MG_MODE
+
     subroutine makeVelocityDivFree(this,u,psi,rho)
     	type(momentumEqn), intent(in) :: this
-    	type(vectorField), intent(inout) :: u 
-    	type(scalarField), intent(in) :: psi, rho
+    	type(vfield), intent(inout) :: u 
+    	type(field), intent(in) :: psi, rho
     	real(DP) :: dt, alpha 
     	
     	dt = this%ptrTime_%dt_
@@ -765,12 +766,14 @@ contains
     	
     end subroutine
     
-!DIR$ ELSEIF DEFINED (FAST_MODE)
+#endif
+    
+#ifdef FAST_MODE
 
     subroutine makeVelocityDivFree(this,u,psi,rho,rho0,nl)
     	type(momentumEqn), intent(in) :: this
-    	type(vectorField), intent(inout) :: u 
-    	type(scalarField), intent(in) :: psi, rho
+    	type(vfield), intent(inout) :: u 
+    	type(field), intent(in) :: psi, rho
     	real(DP), intent(in) :: rho0
     	integer, intent(in) :: nl
     	type(grid), pointer :: mesh
@@ -862,7 +865,7 @@ contains
     subroutine computeOldPressGrad(dpr,dpr0,i,j,k,dir,psi,mesh,n)
     	real(DP), intent(out) :: dpr,dpr0
     	integer, intent(in) :: i,j,k,n,dir
-    	type(scalarField), intent(in) :: psi
+    	type(field), intent(in) :: psi
     	type(grid), intent(in) :: mesh
     	
     	select case(n)
@@ -886,13 +889,15 @@ contains
     	end select
 
     end subroutine
-!DIR$ ENDIF
+
+#endif
+
 !========================================================================================!
 
 !========================================================================================!
     subroutine setEqnBounds(this,u)
     	type(momentumEqn), intent(inout) :: this
-    	type(vectorField), intent(in) :: u
+    	type(vfield), intent(in) :: u
 
 		!ux
     	this%isx_ = u%ux_%is_
@@ -1017,13 +1022,13 @@ contains
     	type(time), intent(in) :: rt
 
 		if ((IS_MASTER) .AND. (rt%scheme_==s_AB2)) then
-			call vectorFieldCTOR(gPhi0,'phi0',gMesh,'sx','sy','sz',1,initOpt=1,&
+			call vfieldCTOR(gPhi0,'phi0',gMesh,'sx','sy','sz',1,initOpt=1,&
 								 nFolder=rt%inputFold_)
 		end if
 		
 		!decompose fluxes
 		if (rt%scheme_==s_AB2) then
-			call vectorFieldCTOR(phi0,'phi0',mesh,'sx','sy','sz',1,initOpt=-1)
+			call vfieldCTOR(phi0,'phi0',mesh,'sx','sy','sz',1,initOpt=-1)
 			call decomposeFieldV(gPhi0,phi0)
 			this%phiX_ = phi0%ux_%f_(this%isx_:this%iex_,this%jsx_:this%jex_,this%ksx_:this%kex_)
 			this%phiY_ = phi0%uy_%f_(this%isy_:this%iey_,this%jsy_:this%jey_,this%ksy_:this%key_)

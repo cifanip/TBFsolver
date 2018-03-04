@@ -26,7 +26,7 @@ module multiGridMod
 
 	type, public :: multiGrid
 		
-		type(dictionary), private :: dict_ 
+		type(parFile), private :: pfile_ 
 		
 		integer :: nLevels_
 		integer, private :: nPreSweep_
@@ -71,19 +71,19 @@ contains
 !========================================================================================!
 	subroutine multiGridCTOR(this,mesh,p,beta,s)
 		type(multiGrid) :: this
-		type(scalarField), intent(inout) :: p, beta, s
+		type(field), intent(inout) :: p, beta, s
 		type(grid), target :: mesh
 		
 		this%ptrMesh_ => mesh
 		
-		call dictionaryCTOR(this%dict_,'pcg_solver','specs')
+		call parFileCTOR(this%pfile_,'pcg_solver','specs')
 		
-		call readParameter(this%dict_,this%nLevels_,'nLevels')
-		call readParameter(this%dict_,this%nPreSweep_,'nPreSweep')
-		call readParameter(this%dict_,this%nPostSweep_,'nPostSweep')
-		call readParameter(this%dict_,this%tol_,'tolMG')
-		call readParameter(this%dict_,this%maxIter_,'maxIterMG')
-		call readParameter(this%dict_,this%fullInfo_,'fullInfoMG')
+		call readParameter(this%pfile_,this%nLevels_,'nLevels')
+		call readParameter(this%pfile_,this%nPreSweep_,'nPreSweep')
+		call readParameter(this%pfile_,this%nPostSweep_,'nPostSweep')
+		call readParameter(this%pfile_,this%tol_,'tolMG')
+		call readParameter(this%pfile_,this%maxIter_,'maxIterMG')
+		call readParameter(this%pfile_,this%fullInfo_,'fullInfoMG')
 		
 		call checkLevelsNumber(this)
 		
@@ -149,7 +149,7 @@ contains
     recursive subroutine initDirectSolver(this,mesh,p)
         type(multiGrid), intent(inout) :: this
         type(grid), intent(in) :: mesh
-		type(scalarField), intent(in) :: p
+		type(field), intent(in) :: p
 		
 		if ( mesh%level_ == 1) then
 			 call poissMatCTOR(this%directS_,mesh,p)
@@ -165,8 +165,8 @@ contains
     subroutine solveMG(this,mesh,p,beta,s)
         type(multiGrid), intent(inout) :: this
         type(grid), intent(in) :: mesh
-		type(scalarField), intent(inout) :: p
-		type(scalarField), intent(inout) :: beta, s
+		type(field), intent(inout) :: p
+		type(field), intent(inout) :: beta, s
 		
 		this%iter_ = 0
 		
@@ -186,8 +186,8 @@ contains
     recursive subroutine mgVcycle(this,mesh,p,beta,s,smoother)
         type(multiGrid), intent(inout) :: this
         type(grid), intent(in) :: mesh
-		type(scalarField), intent(inout) :: p
-		type(scalarField), intent(inout) :: beta, s
+		type(field), intent(inout) :: p
+		type(field), intent(inout) :: beta, s
 		type(rbgs), intent(inout) :: smoother
 		
 		

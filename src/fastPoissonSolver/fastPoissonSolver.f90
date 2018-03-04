@@ -25,7 +25,7 @@ module fastPoissonSolverMod
 ! ************************************************************************************** !
 	
 	use initialConditionsMod, only: pi
-	use scalarFieldMod
+	use fieldMod
 	use pencilDecMod
 	use, intrinsic :: iso_c_binding
 	
@@ -336,8 +336,8 @@ contains
 !========================================================================================!
 	subroutine solveFPS(this,p,s)
 		type(fastPoissonSolver), intent(inout) :: this
-		type(scalarField), intent(inout) :: p
-		type(scalarField), intent(in) :: s
+		type(field), intent(inout) :: p
+		type(field), intent(in) :: s
 		integer :: nx,nz,nxg,nyg,nzg
 
 		nx=p%nx_
@@ -386,7 +386,7 @@ contains
 
 !========================================================================================!
     subroutine zeroAveragePressure(p)
-    	type(scalarField), intent(inout) :: p
+    	type(field), intent(inout) :: p
     	type(grid), pointer :: mesh
         integer :: nx,ny,nz
         integer :: i,j,k,ierror

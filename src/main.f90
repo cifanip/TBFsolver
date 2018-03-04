@@ -31,10 +31,10 @@ PROGRAM main
 	TYPE(mpiControl) :: mpiCTRL
 	type(time) :: runTime
 	type(grid) :: gMesh, mesh
-	type(scalarField) :: gp, p, gpsi, psi
-	type(scalarField) :: gc, c, gcs, cs, gcurv, curv
-	type(scalarField) :: rho, mu
-	type(vectorField) :: gU, U, gW, w, gST, st
+	type(field) :: gp, p, gpsi, psi
+	type(field) :: gc, c, gcs, cs, gcurv, curv
+	type(field) :: rho, mu
+	type(vfield) :: gU, U, gW, w, gST, st
 	type(momentumEqn) :: uEqn
 	type(poissonEqn) :: pEqn
 	type(VOF) :: vofS
@@ -54,11 +54,12 @@ PROGRAM main
 	
 	call vofCTOR(vofS,gmesh,mesh,runTime)
 	call momentumEqnCTOR(uEqn,gMesh,mesh,u,runTime)
-!DIR$ IF DEFINED (FAST_MODE)	
+#ifdef FAST_MODE
 	call poissonEqnCTOR(pEqn,mesh,gMesh,psi,runTime,vofS%rhol_,vofS%rhog_)
-!DIR$ ELSEIF DEFINED (MG_MODE)
+#endif
+#ifdef MG_MODE
 	call poissonEqnCTOR(pEqn,mesh,cs,psi,runTime)
-!DIR$ ENDIF
+#endif
 	
 	!build ramps
 	call rampUpPropCTOR(rhoRamp,vofS%rhog_,vofS%rhol_,vofS%rhog_)
@@ -105,11 +106,12 @@ PROGRAM main
 			call solvePoissonEqn(pEqn,psi,rho,u)	
 			
 			!divergence free velocity			
-!DIR$ IF DEFINED (FAST_MODE)
+#ifdef FAST_MODE
 			call makeVelocityDivFree(uEqn,u,psi,rho,pEqn%rho0_,pEqn%nl_)
-!DIR$ ELSEIF DEFINED (MG_MODE)
+#endif
+#ifdef MG_MODE
 			call makeVelocityDivFree(uEqn,u,psi,rho)
-!DIR$ ENDIF
+#endif
 
 			!set flow rate
 			call setFlowRate(uEqn%flowCtrl_,u,rho,uEqn%Q0_,runTime%dt_,&
@@ -119,11 +121,12 @@ PROGRAM main
     			call computeContinuityError(u,runTime%dt_)
 			
 			!correct pressure
-!DIR$ IF DEFINED (FAST_MODE)
+#ifdef FAST_MODE
 			call updatePressure(pEqn,p,psi)
-!DIR$ ELSEIF DEFINED (MG_MODE)
+#endif
+#ifdef MG_MODE
 			call updatePressure(p,psi)
-!DIR$ ENDIF
+#endif
 			
 		end do	
 

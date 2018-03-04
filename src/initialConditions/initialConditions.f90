@@ -18,7 +18,7 @@
 
 module initialConditionsMod
 
-	use vectorFieldMod
+	use vfieldMod
 
 	implicit none
 	
@@ -36,7 +36,7 @@ contains
 
 !========================================================================================!
     subroutine initChFlowVelocity(u,mesh)
-    	type(vectorField), intent(inout) :: u
+    	type(vfield), intent(inout) :: u
     	type(grid), intent(in) :: mesh
     	real(DP) :: Lx, Ly, Lz
     	integer :: i, j, k
@@ -103,7 +103,7 @@ contains
 
 !========================================================================================!
     subroutine initShearVelocity(u,mesh)
-    	type(vectorField), intent(inout) :: u
+    	type(vfield), intent(inout) :: u
     	type(grid), intent(in) :: mesh
     	integer :: i, j, k
     	real(DP) :: x, y, z
