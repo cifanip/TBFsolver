@@ -4,7 +4,7 @@ POIS_OPT = FAST_MODE
 MEM_OPT = MEM_SAVE
 COMPILER = mpifort
 
-#add paths to MUMPS lib
+#if POIS_OPT=MG_MODE add paths to MUMPS lib
 MUMPS_INCL = 
 MUMPS_LIB_DIR = 
 
