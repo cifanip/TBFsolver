@@ -4,9 +4,9 @@ POIS_OPT = FAST_MODE
 MEM_OPT = MEM_SAVE
 COMPILER = mpifort
 
-#######  compiler options and lib dir
-MUMPS_INCL = $(HOME)/libraries/MUMPS_5.0.2/include
-MUMPS_LIB_DIR = $(HOME)/libraries/MUMPS_5.0.2/lib
+#add paths to MUMPS lib
+MUMPS_INCL = 
+MUMPS_LIB_DIR = 
 
 MUMPS_FLAGS = -ldmumps -lmumps_common -lpord -lmetis -lesmumps \
 -lscotch -lscotcherr
@@ -18,6 +18,7 @@ LIBS = $(MUMPS_FLAGS) $(LAPACK_FLAGS)
 LIB_DIRS = $(MUMPS_LIB_DIR)
 else ifeq ($(POIS_OPT),FAST_MODE)
 LIBS = $(LAPACK_FLAGS) $(FFTW_FLAGS)
+#path to above LIBS may be necessary. if so, add below
 LIB_DIRS = 
 endif
 
