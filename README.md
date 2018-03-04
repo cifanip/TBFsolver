@@ -7,7 +7,7 @@ TBFsolver is an highly accurate and parallelised solver for the direct numerical
 TBFsolver is distributed under the terms of the General Public License. See the file COPYING for details. 
 
 ## INSTALLATION
-See the file 'INSTALL' for instructions.
+See file 'INSTALL' for instructions.
 
 ## USAGE
 An example of a test-case of a minimum turbulent channel flow, loaded with 18 deformable bubbles, is given in folder 'case_18'. Please refer to the [user guide](user_guide/user_guide.pdf) for an illustration of the input parameters. 
