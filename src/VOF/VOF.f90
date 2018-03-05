@@ -4647,6 +4647,11 @@ contains
 
 !========================================================================================!
     subroutine computeBlockCurvature(vofb)
+! ************************************************************************************** !
+! This subroutine is an implementation of the GHF method developed by:
+! Popinet, S. (2009). An accurate adaptive solver for surface-tension-driven 
+! interfacial flows. Journal of Computational Physics, 228(16), 5838-5866.
+! ************************************************************************************** !
         type(vofBlock), intent(inout) :: vofb
         integer :: i, j, k
         real(DP) :: mx, my, mz
@@ -5513,6 +5518,12 @@ contains
 
 !========================================================================================!
     subroutine qCell(vofb,i,j,k,m0,v,delta,q)
+! ************************************************************************************** !
+! This subroutine is an implementation of the analytical relations developed by:
+! Scardovelli, R., & Zaleski, S. (2000). Analytical relations connecting linear 
+! interfaces and volume fractions in rectangular grids. 
+! Journal of Computational Physics, 164(1), 228-237.
+! ************************************************************************************** !
     	type(vofBlock), intent(inout) :: vofb
     	integer, intent(in) :: i,j,k
     	real(DP), dimension(3), intent(in) :: m0, delta
@@ -5648,6 +5659,12 @@ contains
 
 !========================================================================================!
     subroutine vCell(vofb,i,j,k,m0,q0,delta,v)
+! ************************************************************************************** !
+! This subroutine is an implementation of the analytical relations developed by:
+! Scardovelli, R., & Zaleski, S. (2000). Analytical relations connecting linear 
+! interfaces and volume fractions in rectangular grids. 
+! Journal of Computational Physics, 164(1), 228-237.
+! ************************************************************************************** !
     	type(vofBlock), intent(inout) :: vofb
     	integer, intent(in) :: i,j,k
     	real(DP), dimension(3), intent(in) :: m0, delta
