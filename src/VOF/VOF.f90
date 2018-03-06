@@ -4796,18 +4796,18 @@ contains
 			case(1)
 				df => vofb%dxf
 				posf => vofb%xf
-				idx_ub=vofb%idx(2)
-				idx_lb=vofb%idx(1)
+				idx_ub=vofb%idx(2)+offset_c-1
+				idx_lb=vofb%idx(1)-offset_c+1
 			case(2)
 				df => vofb%dyf
 				posf => vofb%yf
-				idx_ub=vofb%idx(4)
-				idx_lb=vofb%idx(3)
+				idx_ub=vofb%idx(4)+offset_c-1
+				idx_lb=vofb%idx(3)-offset_c+1
 			case(3)
 				df => vofb%dzf
 				posf => vofb%zf
-				idx_ub=vofb%idx(6)
-				idx_lb=vofb%idx(5)
+				idx_ub=vofb%idx(6)+offset_c-1
+				idx_lb=vofb%idx(5)-offset_c+1
 			case default
 		end select
 		
