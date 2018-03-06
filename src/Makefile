@@ -17,7 +17,7 @@ ifeq ($(POIS_OPT),MG_MODE)
 LIBS = $(MUMPS_FLAGS) $(LAPACK_FLAGS)
 LIB_DIRS = $(MUMPS_LIB_DIR)
 else ifeq ($(POIS_OPT),FAST_MODE)
-LIBS = $(LAPACK_FLAGS) $(FFTW_FLAGS)
+LIBS = $(FFTW_FLAGS) $(LAPACK_FLAGS)
 #path to above LIBS may be necessary. if so, add below
 LIB_DIRS = 
 endif
