@@ -4843,19 +4843,19 @@ contains
 			
 			select case(dir)
 				case(1)
-					if ((ii>idx_ub).OR.(ii<idx_lb)) then
+					if ((ii>=idx_ub).OR.(ii<=idx_lb)) then
 						isValid(cn) =.FALSE.
 						posi(:,cn)=0.d0
 						return							
 					end if
 				case(2)
-					if ((jj>idx_ub).OR.(jj<idx_lb)) then
+					if ((jj>=idx_ub).OR.(jj<=idx_lb)) then
 						isValid(cn) =.FALSE.
 						posi(:,cn)=0.d0
 						return							
 					end if
 				case(3)
-					if ((kk>idx_ub).OR.(kk<idx_lb)) then
+					if ((kk>=idx_ub).OR.(kk<=idx_lb)) then
 						isValid(cn) =.FALSE.
 						posi(:,cn)=0.d0
 						return							
@@ -4904,19 +4904,19 @@ contains
 				
 			select case(dir)
 				case(1)
-					if ((ii>idx_ub).OR.(ii<idx_lb)) then
+					if ((ii>=idx_ub).OR.(ii<=idx_lb)) then
 						isValid(cn) =.FALSE.
 						posi(:,cn)=0.d0
 						return							
 					end if
 				case(2)
-					if ((jj>idx_ub).OR.(jj<idx_lb)) then
+					if ((jj>=idx_ub).OR.(jj<=idx_lb)) then
 						isValid(cn) =.FALSE.
 						posi(:,cn)=0.d0
 						return							
 					end if
 				case(3)
-					if ((kk>idx_ub).OR.(kk<idx_lb)) then
+					if ((kk>=idx_ub).OR.(kk<=idx_lb)) then
 						isValid(cn) =.FALSE.
 						posi(:,cn)=0.d0
 						return							
