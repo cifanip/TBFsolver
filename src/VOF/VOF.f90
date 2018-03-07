@@ -91,7 +91,7 @@ module VOFMod
 		type(time), pointer :: ptrTime_ => NULL() 
 		
 		!threshold vof field
-		real(DP), private :: eps_ = 1.d-6
+		real(DP), private :: eps_ = 1.d-8
 		
 		!halo dim of box volume fraction field
 		integer, private :: hd_
