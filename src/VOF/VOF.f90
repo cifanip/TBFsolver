@@ -1817,31 +1817,31 @@ contains
 
     	!exception periodic bc
     	if (wrap_x) then
-    		do i=is+offset,ie-offset
-				im(i)=modulo(i-1,nxg)+1
-			end do
+    		do i=is,ie
+			im(i)=modulo(i-1,nxg)+1
+		end do
     	else
-    		do i=is+offset,ie-offset
-				im(i)=i
-			end do	
+    		do i=is,ie
+			im(i)=i
+		end do	
     	end if
     	if (wrap_y) then
-    		do j=js+offset,je-offset
-				jm(j)=modulo(j-1,nyg)+1
-			end do
+    		do j=js,je
+			jm(j)=modulo(j-1,nyg)+1
+		end do
     	else
-    		do j=js+offset,je-offset
-				jm(j)=j
-			end do	
+    		do j=js,je
+			jm(j)=j
+		end do	
     	end if
     	if (wrap_z) then
-    		do k=ks+offset,ke-offset
-				km(k)=modulo(k-1,nzg)+1
-			end do
+    		do k=ks,ke
+			km(k)=modulo(k-1,nzg)+1
+		end do
     	else
-    		do k=ks+offset,ke-offset
-				km(k)=k
-			end do	
+    		do k=ks,ke
+			km(k)=k
+		end do	
     	end if
     	
     	!complete boundary indexes
@@ -1854,12 +1854,12 @@ contains
     		km(ke-offset+i)=km(ke-offset)+i
     	end do
 
-    	i0gm=i0g-offset
-    	i1gm=i1g+offset
-    	j0gm=j0g-offset
-    	j1gm=j1g+offset
-    	k0gm=k0g-offset
-    	k1gm=k1g+offset
+    	i0gm=i0g
+    	i1gm=i1g
+    	j0gm=j0g
+    	j1gm=j1g
+    	k0gm=k0g
+    	k1gm=k1g
     		
     	
     	idx_buff(1,:)=-1
@@ -1890,9 +1890,9 @@ contains
 					jl=jm(j)-j0g+1
 					kl=km(k)-k0g+1
 					
-					if ((im(i)<=i1g).AND.(im(i)>=i0gm)) then
-						if ((jm(j)<=j1g).AND.(jm(j)>=j0g)) then
-							if ((km(k)<=k1g).AND.(km(k)>=k0g)) then
+					if ((im(i)<=i1gm).AND.(im(i)>=i0gm)) then
+						if ((jm(j)<=j1gm).AND.(jm(j)>=j0gm)) then
+							if ((km(k)<=k1gm).AND.(km(k)>=k0gm)) then
 								idx_buff(1,n)=0
 								idx_buff(2,n)=il
 								idx_buff(3,n)=jl
@@ -2766,12 +2766,12 @@ contains
 
 			do b=1,s_nblk
 			
-				is=vofBlocks(b)%idx(1)
-				ie=vofBlocks(b)%idx(2)
-				js=vofBlocks(b)%idx(3)
-				je=vofBlocks(b)%idx(4)
-				ks=vofBlocks(b)%idx(5)
-				ke=vofBlocks(b)%idx(6)
+				is=vofBlocks(b)%idx(1)-offset_st
+				ie=vofBlocks(b)%idx(2)+offset_st
+				js=vofBlocks(b)%idx(3)-offset_st
+				je=vofBlocks(b)%idx(4)+offset_st
+				ks=vofBlocks(b)%idx(5)-offset_st
+				ke=vofBlocks(b)%idx(6)+offset_st
 				
 				bn=vofBlocks(b)%bn
 				
