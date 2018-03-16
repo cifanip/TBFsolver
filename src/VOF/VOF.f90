@@ -1843,16 +1843,6 @@ contains
 			km(k)=k
 		end do	
     	end if
-    	
-    	!complete boundary indexes
-    	do i=1,offset
-    		im(is+offset-i)=im(is+offset)-i
-    		jm(js+offset-i)=jm(js+offset)-i
-    		km(ks+offset-i)=km(ks+offset)-i
-    		im(ie-offset+i)=im(ie-offset)+i
-    		jm(je-offset+i)=jm(je-offset)+i
-    		km(ke-offset+i)=km(ke-offset)+i
-    	end do
 
     	i0gm=i0g
     	i1gm=i1g
