@@ -96,8 +96,8 @@ PROGRAM main
 			call computeSurfaceTension(vofS,st,curv)			
 			call updateMaterialProps(vofS,c,cs,rho,mu)
 			
-			call setPressGrad(uEqn%flowCtrl_,cs,rho,vofS%rhog_,vofS%rhol_,&
-			 		          vofS%mul_,uEqn%gCH_,uEqn%fs_)
+			call setPressGrad(uEqn%flowCtrl_,rho,vofS%rhol_,vofS%mul_,&
+							  uEqn%gCH_,uEqn%fs_)
 
 			!solve momentum equation
 			call solveMomentumEqn(uEqn,u,p,mu,rho,st,c)
