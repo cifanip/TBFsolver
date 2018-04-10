@@ -11,3 +11,6 @@ See file 'INSTALL' for instructions.
 
 ## USAGE
 An example of a test-case of a minimum turbulent channel flow, loaded with 18 deformable bubbles, is given in folder 'case_18'. Please refer to the [user guide](user_guide/user_guide.pdf) for an illustration of the input parameters. 
+
+### AWARD
+Best numerical code in the Netherlands for serious applications on a significant part of a large High Performance Computing system. [Wim Nieuwpoort Award 2107](https://www.surf.nl/en/news/2018/01/wim-nieuwpoort-award-for-research-into-bubbly-turbulence.html)
