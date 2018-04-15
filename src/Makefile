@@ -33,11 +33,11 @@ FLAGS = -O2 -fbacktrace
 
 ifeq ($(POIS_OPT),MG_MODE)
 OBJS = kinds.o formats.o interpolation.o initMpiGvar.o ompRoutines.o errorHandler.o allocateArrays.o mpiControl.o \
-grid.o parFile.o field.o rbgs.o poissMat.o multiGrid.o vfield.o momentumEqn.o \
+grid.o parFile.o field.o rbgs.o poissMat.o multiGrid.o vfield.o momentumEqn.o vofBlocks.o \
 poissonEqn.o time.o auxiliaryRoutines.o initialConditions.o VOF.o statistics.o pcg.o rampUpProp.o main.o
 else ifeq ($(POIS_OPT),FAST_MODE)
 OBJS = kinds.o formats.o interpolation.o initMpiGvar.o ompRoutines.o errorHandler.o allocateArrays.o \
-mpiControl.o grid.o parFile.o field.o vfield.o momentumEqn.o poissonEqn.o time.o \
+mpiControl.o grid.o parFile.o field.o vfield.o momentumEqn.o poissonEqn.o time.o vofBlocks.o \
 auxiliaryRoutines.o initialConditions.o statistics.o pencilDec.o fastPoissonSolver.o VOF.o rampUpProp.o main.o
 endif
 
@@ -122,7 +122,10 @@ auxiliaryRoutines.o: vfield.o auxiliaryRoutines/auxiliaryRoutines.f90
 initialConditions.o: vfield.o initialConditions/initialConditions.f90
 	$(COMPILER) -c $(FLAGS) initialConditions/initialConditions.f90 $(OMP_FLAG)
 
-VOF.o: time.o VOF/VOF.f90
+vofBlocks.o: initialConditions.o VOF/vofBlocks.f90
+	$(COMPILER) -c $(FLAGS) VOF/vofBlocks.f90 $(OMP_FLAG)
+
+VOF.o: vofBlocks.o time.o VOF/VOF.f90
 	$(COMPILER) -c $(FLAGS) VOF/VOF.f90 $(OMP_FLAG)
 
 statistics.o: vfield.o statistics/statistics.f90
