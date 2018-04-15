@@ -30,6 +30,7 @@ module initialConditionsMod
 	
 	public :: initChFlowVelocity
 	public :: initShearVelocity
+	public :: init_Bubble_vf
 	
 	
 contains
@@ -158,7 +159,216 @@ contains
     end subroutine
 !========================================================================================!
 
-	
+!========================================================================================!
+    subroutine init_Bubble_vf(mesh,cblk,x0,y0,z0,R,nref)
+    	type(grid), intent(in) :: mesh
+		real(DP), allocatable, dimension(:,:,:), intent(inout) :: cblk
+		real(DP), intent(in) :: x0,y0,z0,R
+		integer, intent(in) :: nref
+		integer :: is,js,ks,ie,je,ke,i,j,k,count,ir,kr,jr
+		real(DP), allocatable, dimension(:) :: xcv,ycv,zcv,xfv,yfv,zfv,dxfv,dyfv,dzfv
+		real(DP) :: x,y,z,rad,dx,dy,dz,dxref,dyref,dzref,xs,ys,zs,Vex,V
+		
+		is=lbound(cblk,1)
+		ie=ubound(cblk,1)
+		js=lbound(cblk,2)
+		je=ubound(cblk,2)	
+		ks=lbound(cblk,3)
+		ke=ubound(cblk,3)
+		
+		!copy from global mesh
+		call allocateArray(xcv,is,ie)
+		call allocateArray(ycv,js,je)
+		call allocateArray(zcv,ks,ke)
+		xcv=mesh%xc_(is:ie)
+		ycv=mesh%yc_(js:je)
+		zcv=mesh%zc_(ks:ke)
+		
+		call allocateArray(xfv,is-1,ie)
+		call allocateArray(yfv,js-1,je)
+		call allocateArray(zfv,ks-1,ke)
+		xfv=mesh%xc_(is-1:ie)
+		yfv=mesh%yc_(js-1:je)
+		zfv=mesh%zc_(ks-1:ke)
+		
+		call allocateArray(dxfv,is,ie)
+		call allocateArray(dyfv,js,je)
+		call allocateArray(dzfv,ks,ke)		
+		dxfv=mesh%dxf_(is:ie)
+		dyfv=mesh%dyf_(js:je)
+		dzfv=mesh%dzf_(ks:ke)
+		
+		!init to zero
+		cblk=0.d0
+		
+		!init gas cells
+		do k=ks,ke
+			do j=js,je
+				do i=is,ie
+				
+					x = xcv(i)-x0
+					y = ycv(j)-y0
+					z = zcv(k)-z0
+					
+					rad= x*x+y*y+z*z
+					
+					if (rad <= (R*R)) then
+						cblk(i,j,k) = 1.d0
+					end if
+					
+				end do
+			end do
+		end do
+		
+		!refine vof for interface cells
+		do k=ks,ke
+			do j=js,je
+				do i=is,ie
+				
+					count = 0
+					
+					!v1
+					x = xfv(i-1)-x0
+					y = yfv(j-1)-y0
+					z = zfv(k-1)-z0
+					
+   					rad = x*x+y*y+z*z
+   					if (rad <= R*R) then
+   						count = count + 1
+   					end if 
+					
+					!v2
+					x = xfv(i)-x0
+					y = yfv(j-1)-y0
+					z = zfv(k-1)-z0
+					
+   					rad = x*x+y*y+z*z
+   					if (rad <= R*R) then
+   						count = count + 1
+   					end if 
+					
+					!v3
+					x = xfv(i)-x0
+					y = yfv(j-1)-y0
+					z = zfv(k)-z0
+					
+   					rad = x*x+y*y+z*z
+   					if (rad <= R*R) then
+   						count = count + 1
+   					end if 
+					
+					!v4
+					x = xfv(i-1)-x0
+					y = yfv(j-1)-y0
+					z = zfv(k)-z0
+					
+   					rad = x*x+y*y+z*z
+   					if (rad <= R*R) then
+   						count = count + 1
+   					end if 
+					
+					!v5
+					x = xfv(i-1)-x0
+					y = yfv(j)-y0
+					z = zfv(k-1)-z0
+					
+   					rad = x*x+y*y+z*z
+   					if (rad <= R*R) then
+   						count = count + 1
+   					end if 
+					
+					!v6
+					x = xfv(i)-x0
+					y = yfv(j)-y0
+					z = zfv(k-1)-z0
+					
+   					rad = x*x+y*y+z*z
+   					if (rad <= R*R) then
+   						count = count + 1
+   					end if 
+					
+					!v7
+					x = xfv(i)-x0
+					y = yfv(j)-y0
+					z = zfv(k)-z0
+					
+   					rad = x*x+y*y+z*z
+   					if (rad <= R*R) then
+   						count = count + 1
+   					end if 
+					
+					!v8
+					x = xfv(i-1)-x0
+					y = yfv(j)-y0
+					z = zfv(k)-z0
+					
+   					rad = x*x+y*y+z*z
+   					if (rad <= R*R) then
+   						count = count + 1
+   					end if 
+   					
+   					if ((count >0) .AND. (count < 8)) then 
+   					
+   						!reset vof interface cell
+   						cblk(i,j,k) = 0.d0
+   											
+   						dx = dxfv(i)
+   						dy = dyfv(j)
+   						dz = dzfv(k)
+   						dxref = dx/nref
+   						dyref = dy/nref
+   						dzref = dz/nref
+   						xs = xfv(i-1)
+						ys = yfv(j-1)
+						zs = zfv(k-1)
+   						
+   						do kr=1,nref
+   							do jr=1,nref
+   								do ir=1,nref
+
+ 									x = xs+0.5d0*dxref+(ir-1)*dxref-x0
+									y = ys+0.5d0*dyref+(jr-1)*dyref-y0
+									z = zs+0.5d0*dzref+(kr-1)*dzref-z0
+					
+   									rad = x*x+y*y+z*z
+   									if (rad <= R*R) then
+   										cblk(i,j,k) = cblk(i,j,k)+dxref*dyref*dzref
+   									end if  
+   									 									
+   								end do
+   							end do
+   						end do
+   						
+   						cblk(i,j,k) = cblk(i,j,k)/(dx*dy*dz)
+   						
+   					end if
+					
+					
+				end do
+			end do
+		end do	
+
+
+		Vex = (4.d0/3.d0)*pi*R*R*R
+		V=0.d0
+		do k=ks,ke
+			do j=js,je
+				do i=is,ie
+   					dx = dxfv(i)
+   					dy = dyfv(j)
+   					dz = dzfv(k)
+					V=V+cblk(i,j,k)*dx*dy*dz
+				end do
+			end do
+		end do
+
+		!******** uncomment to print out volume error
+		!write(*,'(A,'//s_outputFormat(2:9)//')') &
+		!		'VOF bubbles volume error: ', abs(V-Vex)/Vex
+        
+    end subroutine
+!========================================================================================!
+
 end module initialConditionsMod
 
 
