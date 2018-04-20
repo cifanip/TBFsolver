@@ -14,3 +14,6 @@ TBFsolver is being continuously updated in order to fix possible bugs and add ne
 
 ### AWARD
 Best numerical code in the Netherlands for serious applications on a significant part of a large High Performance Computing system. [Wim Nieuwpoort Award 2107](https://www.surf.nl/en/news/2018/01/wim-nieuwpoort-award-for-research-into-bubbly-turbulence.html)
+
+### CITATION
+You can acknowledge the use of this code in any scientific publication/work using the following DOI: [cite](https://doi.org/10.5281/zenodo.1222098)
