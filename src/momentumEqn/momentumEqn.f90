@@ -55,6 +55,9 @@ module momentumEqnMod
 		!flow rate
 		real(DP) :: Q0_
 		
+		!theoretical shear Re
+		real(DP) :: Ret_
+		
 		!flow control
 		integer :: flowCtrl_
 
@@ -120,6 +123,10 @@ contains
         
         !init source term
         this%fs_ = 0.d0
+        
+        if (this%flowCtrl_==1) then
+        	call readParameter(pfile_flow,this%Ret_,'Ret')
+        end if
         
         if (this%flowCtrl_==2) then
         	call computeFlowRate(u,this%Q0_)      	
