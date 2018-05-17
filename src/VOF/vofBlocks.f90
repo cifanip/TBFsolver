@@ -2586,7 +2586,8 @@ contains
     	integer, intent(in) :: nFolder
         character(len=20) :: dirName,bn
         integer :: i,lbi,ubi,lbj,ubj,lbk,ubk
-			
+        
+        if (allocated(vofBlocks)) then
         
         write(dirName,s_intFormat) nFolder
         
@@ -2621,6 +2622,8 @@ contains
 			
 			close(s_IOunitNumber)			
 		end do
+		
+		end if
         
      end subroutine   	
 !========================================================================================!
