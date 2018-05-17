@@ -219,9 +219,9 @@ contains
         	run = .TRUE.
         	if (IS_MASTER) then
         		if (this%scheme_==s_RK3) then
-        			write(*,'(A,I2)') '	rk step: ', this%rkIter_
+        			write(*,'(A,I2)') ' 	RK STEP: ', this%rkIter_
         		else
-        			write(*,'(A)') ' AB2 step'
+        			write(*,'(A)') ' 	AB2 STEP'
         		end if
         	end if
         end if
@@ -286,9 +286,13 @@ contains
 
 		if (IS_MASTER) then
 			write(*,*) ''
-		
-			write(*,'(3(A,'//s_outputFormat(2:9)//'))') 'SOLVING FOR TIME: t = ', this%t_, '  dt = ', this%dt_, &
-			  	'  CFL max = ', this%cflMax_
+			
+			write(*,*) 'SOLVING FOR TIME:'
+			
+			write(*,'(A,'//s_doubleFormat(2:10)//')') '	t  =', this%t_
+			write(*,'(A,'//s_outputFormat(2:9)//')') '	dt =  ', this%dt_
+			write(*,'(A,'//s_outputFormat(2:9)//')') '	CFL max = ', this%dt_
+
 		end if
 
     end subroutine
