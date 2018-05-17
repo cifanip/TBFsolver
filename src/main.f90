@@ -31,7 +31,7 @@ PROGRAM main
 	integer, parameter :: SINGLE_PHASE_FLOW = 1
 	integer, parameter :: TWO_PHASE_FLOW  = 2
 	
-	integer :: ierror,flow_mode
+	integer :: ierror,flow_solver
 	type(mpiControl) :: mpiCTRL
 	type(time) :: runTime
 	type(grid) :: gMesh, mesh
@@ -44,7 +44,7 @@ PROGRAM main
 	type(VOF) :: vofS
 	type(statistics) :: stats
 	type(rampUpProp) :: rhoRamp,muRamp
-	type(parFile) :: file_fmode
+	type(parFile) :: file_fsolver
 	real(DP) :: t_S, t_E, t_S0, t_E0
 
 
@@ -54,10 +54,14 @@ PROGRAM main
 	call timeCTOR(runTime,u,mpiCTRL)	
 	
 	t_S0 = MPI_Wtime()
+	
+	!read flow solver type
+	call parFileCTOR(file_fsolver,'flowSolver','specs')
+	call readParameter(file_fsolver,flow_solver,'flow_solver')
 
 	INCLUDE 'createFields_H.f90'
 	
-	call vofCTOR(vofS,gmesh,mesh,runTime)
+	call vofCTOR(vofS,gmesh,mesh,runTime,flow_solver,TWO_PHASE_FLOW)
 	call momentumEqnCTOR(uEqn,gMesh,mesh,u,runTime)
 #ifdef FAST_MODE
 	call poissonEqnCTOR(pEqn,mesh,gMesh,psi,runTime,vofS%rhol_,vofS%rhog_)
@@ -80,14 +84,11 @@ PROGRAM main
 	end if
 	
 	!***************************** FLOW SOLVER ******************************!
-	call parFileCTOR(file_fmode,'flowMode','specs')
-	call readParameter(file_fmode,flow_mode,'flowMode')
-	
-	if (flow_mode==SINGLE_PHASE_FLOW) then
+	if (flow_solver==SINGLE_PHASE_FLOW) then
 		call sph_flow_solver()
 	end if
 
-	if (flow_mode==TWO_PHASE_FLOW) then
+	if (flow_solver==TWO_PHASE_FLOW) then
 		call tph_flow_solver()
 	end if		
 	!************************************************************************!
