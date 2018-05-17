@@ -32,5 +32,5 @@ call printOldTimeFlux(uEqn,runTime%scheme_,runTime%outputFold_)
 !write stats
 call writeStats(stats,runTime%outputFold_)
 
-!uncomment to write boxes: make sure every MPI proc can see and write in the main folder)
+!uncomment to write boxes: make sure every MPI proc can see and write in the main folder.
 !call printVOFblocks(runTime%outputFold_)
