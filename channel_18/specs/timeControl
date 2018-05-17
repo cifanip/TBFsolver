@@ -18,7 +18,7 @@
 
 
 Tf 1000.d0
-dt 4.d-3
+dt 1.d-3
 writeInterval -1
 dtout 100.d0
 input_folder 0
