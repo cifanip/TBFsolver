@@ -237,14 +237,14 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-     subroutine setPressGrad(f_ctrl,rho,rhol,mul,g,f)
+     subroutine setPressGrad(f_ctrl,Ret,rho,rhol,mul,g,f)
     	integer, intent(in) :: f_ctrl
     	type(field), intent(in) :: rho
-    	real(DP), intent(in) :: rhol,mul,g
+    	real(DP), intent(in) :: rhol,mul,g,Ret
     	real(DP), intent(inout) :: f
     	type(grid), pointer :: mesh
 		type(mpiControl), pointer :: mpic
-		real(DP) :: x,rho_sum,rho_sum_g,rhoAv,Ret,nul,Re,tauw
+		real(DP) :: x,rho_sum,rho_sum_g,rhoAv,nul,Re,tauw
 		integer :: nx,ny,nz,i,j,k,ierror
 		
 		
@@ -278,7 +278,6 @@ contains
 			
 		if (f_ctrl==1) then
 		
-			Ret = 127.3d0
 			nul = mul/rhol
 			Re = 1.d0/nul
 			tauw = (Ret/Re)*(Ret/Re)
