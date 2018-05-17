@@ -53,6 +53,9 @@ module statisticsMod
 	real(DP), allocatable, dimension(:,:) :: dumg_,dudumg_
 	real(DP), allocatable, dimension(:,:) :: duml_,duduml_
 	
+	!time average total wall shear stress
+	real(DP) :: tauw_tav
+	
 	type, public :: statistics
 	
 		real(DP), private :: Ts_
@@ -62,6 +65,7 @@ module statisticsMod
 		type(vfield), pointer :: w_ => NULL()
 		type(field), pointer :: p_ => NULL()
 		type(field), pointer :: c_ => NULL()
+		type(field), pointer :: mu_ => NULL()
 		
 		!slice volume
 		real(DP), allocatable, dimension(:) :: Vs_
@@ -97,19 +101,20 @@ contains
 
 
 !========================================================================================!
-	subroutine statisticsCTOR(this,u,w,p,c,nu,gmesh)
+	subroutine statisticsCTOR(this,u,w,p,c,mu,nu,gmesh)
 		type(statistics), intent(out) :: this
 		type(vfield), target, intent(in) :: u,w
-		type(field), target, intent(in) :: p,c
+		type(field), target, intent(in) :: p,c,mu
 		real(DP), intent(in) :: nu
 		type(grid), target, intent(in) :: gmesh
 		type(parFile) :: pfile
 		integer :: nyg
 		
-		this%p_ => p
-		this%u_ => u
-		this%w_ => w
-		this%c_ => c
+		this%p_ =>  p
+		this%u_ =>  u
+		this%w_ =>  w
+		this%c_ =>  c
+		this%mu_ => mu
 		
 		this%nu_ = nu
 		
@@ -189,6 +194,8 @@ contains
 			duml_ = 0.d0
 			duduml_ = 0.d0
 			
+			tauw_tav = 0.d0
+			
 		end if
 		
 		!allocate space average volume
@@ -207,13 +214,13 @@ contains
 		real(DP), intent(in) :: t, dt
 		real(DP) :: start,finish
 		
+		start = MPI_Wtime()  
+		
 		if (.not.this%hasTimeAvStarted_) then
 			call checkTimeAverage(this,t)
 		end if
 		
 		if (this%isTimeAverage_) then
-		
-			start = MPI_Wtime()  
 			
 			call updateStatsVF(this,t,dt)
 	
@@ -224,15 +231,14 @@ contains
 			call updateStatsGradU(this,t,dt,s_whole_region)
 			call updateStatsGradU(this,t,dt,s_gas_region)
 			call updateStatsGradU(this,t,dt,s_liquid_region)
-			
-			!output total shear stress
-			call shearStress(this,t)
-		
-        	finish = MPI_Wtime()
-        
-        	call info(finish-start)
         
         end if
+        
+        call shearStress(this,t,dt)
+        
+        finish = MPI_Wtime()
+        
+        call info(finish-start)
 	
 	end subroutine
 !========================================================================================!
@@ -397,6 +403,11 @@ contains
 		call reduceStat(ppm,sppm,this%Vs_,mpic,stat_scalar)
 		call reduceStat(uum,suum,this%Vs_,mpic,stat_symtensor)
 		call reduceStat(wwm,swwm,this%Vs_,mpic,stat_symtensor)
+		
+		!output time average shear stress liquid
+		if (region==s_liquid_region) then
+			!call shearStress_liquid(this,sum,t)
+		end if
 		
 		!update time averages
 		if (IS_MASTER) then
@@ -840,7 +851,7 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-	subroutine shearStress(this,t)
+	subroutine shearStress_liquid(this,t)
 		type(statistics), intent(in) :: this
 		real(DP), intent(in) :: t
 		real(DP) :: y1,y2,u1,u2,dudy,tw
@@ -874,6 +885,109 @@ contains
 		end if
 		
 
+	end subroutine
+!========================================================================================!
+
+!========================================================================================!
+	subroutine shearStress(this,t,dt)
+		type(statistics), intent(in) :: this
+		real(DP), intent(in) :: t,dt
+		type(vfield), pointer :: u => NULL()
+		type(field), pointer :: mu => NULL()
+		type(mpiControl), pointer :: mpic => NULL()
+		integer :: i,j,k,ip,im,jp,jm,kp,km,q,nx,ny,nz,ierror,pmin,pmax,pcoord
+		real(DP), dimension(2) :: sw
+		integer, dimension(2) :: plate,qloop
+		real(DP) :: mur,mul,duxdy,duydx,A,dx,dz,tau,tau_g,Lx,Lz
+	
+
+		u  => this%u_
+		mu => this%mu_
+		mpic => this%u_%ptrMesh_%ptrMPIC_
+
+		nx = u%ptrMesh_%nx_
+		ny = u%ptrMesh_%ny_
+		nz = u%ptrMesh_%nz_
+		
+		Lx = u%ptrMesh_%Lxg_
+		Lz = u%ptrMesh_%Lzg_
+
+		tau=0.d0
+		plate(1)=1
+		plate(2)=ny
+		
+		!check procs adjacent to wall only
+		pmin = 0
+		pmax = mpic%nProcsAxis_(2)-1
+		pcoord = mpic%procCoord_(2)
+		
+		if ((pcoord==pmin).AND.(pcoord==pmax)) then
+			qloop(1)=1
+			qloop(2)=2
+		elseif (pcoord==pmin) then
+			qloop(1)=1
+			qloop(2)=1
+		elseif (pcoord==pmax) then
+			qloop(1)=2
+			qloop(2)=2	
+		else
+			qloop(1)=1
+			qloop(2)=0		
+		end if		
+
+		
+		do q=qloop(1),qloop(2)
+			
+			j=plate(q)
+			jm=j-1
+			jp=j+1
+		
+			if (q==1) then
+				sw(1)=0.d0
+				sw(2)=1.d0
+			else
+				sw(1)=1.d0
+				sw(2)=0.d0
+			end if
+		
+			do k = 0,nz-1
+				kp = k + 1
+				km = k - 1
+				do i = 0,nx-1
+			
+					ip = i + 1
+					im = i - 1
+				
+					dx=u%ptrMesh_%dxc_(ip)
+					dz=u%ptrMesh_%dzf_(k)
+					A=dx*dz
+								
+					mur = sw(1)*0.25d0*(mu%f_(ip,j,k)+mu%f_(i,j,k)+mu%f_(ip,jp,k)+mu%f_(i,jp,k))
+					mul = sw(2)*0.25d0*(mu%f_(ip,j,k)+mu%f_(i,j,k)+mu%f_(ip,jm,k)+mu%f_(i,jm,k)) 	  
+					duxdy =   mur*(u%ux_%f_(i,jp,k)-u%ux_%f_(i,j,k))/(u%ptrMesh_%dyc_(jp))	&
+				     	    - mul*(u%ux_%f_(i,j,k)-u%ux_%f_(i,jm,k))/(u%ptrMesh_%dyc_(j))
+
+					tau = tau + A*duxdy
+				
+				end do
+			end do
+			
+		end do
+		
+        call Mpi_reduce(tau, tau_g, 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, mpic%cartComm_, ierror)
+
+		if (IS_MASTER) then
+		
+			tau_g=tau_g/(Lx*Lz)
+			write(*,'(A,'//s_doubleFormat(2:10)//')') '	(tau_w)_A:  ', tau_g		
+		
+			if (this%isTimeAverage_) then
+				tauw_tav = ( tauw_tav*(t-this%Ts_)+tau_g*dt ) / (t-this%Ts_+dt)
+				write(*,'(A,'//s_doubleFormat(2:10)//')') '	(tau_w)_A,t:', tauw_tav
+			end if
+
+		end if
+	
 	end subroutine
 !========================================================================================!
 
