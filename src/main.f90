@@ -27,8 +27,12 @@ PROGRAM main
 	
 	
 	IMPLICIT NONE
-	INTEGER :: ierror
-	TYPE(mpiControl) :: mpiCTRL
+	
+	integer, parameter :: SINGLE_PHASE_FLOW = 1
+	integer, parameter :: TWO_PHASE_FLOW  = 2
+	
+	integer :: ierror,flow_mode
+	type(mpiControl) :: mpiCTRL
 	type(time) :: runTime
 	type(grid) :: gMesh, mesh
 	type(field) :: gp, p, gpsi, psi
@@ -40,6 +44,7 @@ PROGRAM main
 	type(VOF) :: vofS
 	type(statistics) :: stats
 	type(rampUpProp) :: rhoRamp,muRamp
+	type(parFile) :: file_fmode
 	real(DP) :: t_S, t_E, t_S0, t_E0
 
 
@@ -60,89 +65,32 @@ PROGRAM main
 #ifdef MG_MODE
 	call poissonEqnCTOR(pEqn,mesh,cs,psi,runTime)
 #endif
-	
+
 	!build ramps
 	call rampUpPropCTOR(rhoRamp,vofS%rhog_,vofS%rhol_,vofS%rhog_)
 	call rampUpPropCTOR(muRamp,vofS%mug_,vofS%mul_,vofS%mug_)
 	call updateMaterialProps(vofS,c,cs,rho,mu)
 
-	call statisticsCTOR(stats,u,w,p,c,vofS%mul_/vofS%rhol_,gMesh)
-
+	call statisticsCTOR(stats,u,w,p,c,mu,vofS%mul_/vofS%rhol_,gMesh)
 	
 	if (IS_MASTER) then
 		write(*,*) ''
 		write(*,'(A,'//s_intFormat(2:3)//',A)') &
 				'INIT TIME-INTEGRATOR on ', mpiCTRL%nProcs_*N_THREADS, ' cores'
 	end if
-
-	!cycle time loop
-	do while (timeloop(runTime))
 	
-		t_S = MPI_Wtime()
-		
-		!update ramped props
-		call updateProp(rhoRamp,runTime%t_,vofS%rhog_)
-		call updateProp(muRamp,runTime%t_,vofS%mug_)
+	!***************************** FLOW SOLVER ******************************!
+	call parFileCTOR(file_fmode,'flowMode','specs')
+	call readParameter(file_fmode,flow_mode,'flowMode')
+	
+	if (flow_mode==SINGLE_PHASE_FLOW) then
+		call sph_flow_solver()
+	end if
 
-		!update stats
-		call updateStats(stats,runTime%t_,runTime%dt_)
-		
-		do while (timeRkStep(runTime))	
-
-			!advect VOF
-			call solveVOF(vofS,c,u)
-			
-			!update surface tension and mat pros
-			call computeSurfaceTension(vofS,st,curv)			
-			call updateMaterialProps(vofS,c,cs,rho,mu)
-			
-			call setPressGrad(uEqn%flowCtrl_,rho,vofS%rhol_,vofS%mul_,&
-							  uEqn%gCH_,uEqn%fs_)
-
-			!solve momentum equation
-			call solveMomentumEqn(uEqn,u,p,mu,rho,st,c)
-
-			!solve poisson equation
-			call solvePoissonEqn(pEqn,psi,rho,u)	
-			
-			!divergence free velocity			
-#ifdef FAST_MODE
-			call makeVelocityDivFree(uEqn,u,psi,rho,pEqn%rho0_,pEqn%nl_)
-#endif
-#ifdef MG_MODE
-			call makeVelocityDivFree(uEqn,u,psi,rho)
-#endif
-
-			!set flow rate
-			call setFlowRate(uEqn%flowCtrl_,u,rho,uEqn%Q0_,runTime%dt_,&
-					         alphaRKS(runTime))
-
-			!print out continuity error
-    			call computeContinuityError(u,runTime%dt_)
-			
-			!correct pressure
-#ifdef FAST_MODE
-			call updatePressure(pEqn,p,psi)
-#endif
-#ifdef MG_MODE
-			call updatePressure(p,psi)
-#endif
-			
-		end do	
-
-		!call computeVorticity(u,w)
-
-		if (timeOutput(runTime)) then
-			INCLUDE 'writeFields_H.f90'
-		end if
-			
-		t_E = MPI_Wtime()
-		
-		if (IS_MASTER) then
-			write(*,'(A,'//s_outputFormat(2:9)//')') '	TOTAL CPU TIME: ', t_E-t_S
-		end if
-		
-	end do
+	if (flow_mode==TWO_PHASE_FLOW) then
+		call tph_flow_solver()
+	end if		
+	!************************************************************************!
 	
 	!write final before exit
 	INCLUDE 'writeFields_H.f90'
@@ -169,6 +117,151 @@ PROGRAM main
 
 contains
 
+!========================================================================================!
+    subroutine tph_flow_solver()
+
+	!cycle time loop
+	do while (timeloop(runTime))
+	
+		t_S = MPI_Wtime()
+		
+		!update ramped props
+		call updateProp(rhoRamp,runTime%t_,vofS%rhog_)
+		call updateProp(muRamp,runTime%t_,vofS%mug_)
+
+		!update stats
+		call updateStats(stats,runTime%t_,runTime%dt_)
+		
+		do while (timeRkStep(runTime))	
+
+			!advect VOF
+			call solveVOF(vofS,c,u)
+			
+			!update surface tension and mat pros
+			call computeSurfaceTension(vofS,st,curv)			
+			call updateMaterialProps(vofS,c,cs,rho,mu)
+			
+			call setPressGrad(uEqn%flowCtrl_,uEqn%Ret_,rho,vofS%rhol_,vofS%mul_,&
+							  uEqn%gCH_,uEqn%fs_)
+
+			!solve momentum equation
+			call solveMomentumEqn(uEqn,u,p,mu,rho,st,c)
+
+			!solve poisson equation
+			call solvePoissonEqn(pEqn,psi,rho,u)	
+			
+			!divergence free velocity			
+#ifdef FAST_MODE
+			call makeVelocityDivFree(uEqn,u,psi,rho,pEqn%rho0_,pEqn%nl_)
+#endif
+#ifdef MG_MODE
+			call makeVelocityDivFree(uEqn,u,psi,rho)
+#endif
+
+			!set flow rate
+			call setFlowRate(uEqn%flowCtrl_,u,rho,uEqn%Q0_,runTime%dt_,&
+					         alphaRKS(runTime))
+
+			!print out continuity error
+    		call computeContinuityError(u,runTime%dt_)
+			
+			!correct pressure
+#ifdef FAST_MODE
+			call updatePressure(pEqn,p,psi)
+#endif
+#ifdef MG_MODE
+			call updatePressure(p,psi)
+#endif
+			
+		end do	
+
+		!call computeVorticity(u,w)
+
+		if (timeOutput(runTime)) then
+			INCLUDE 'writeFields_H.f90'
+		end if
+			
+		t_E = MPI_Wtime()
+		
+		if (IS_MASTER) then
+			write(*,'(A,'//s_outputFormat(2:9)//')') '	TOTAL CPU TIME: ', t_E-t_S
+		end if
+		
+	end do
+
+    	
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
+    subroutine sph_flow_solver()
+    
+    c%f_   = 0.d0
+    cs%f_  = 0.d0
+    rho%f_ = vofS%rhol_
+    mu%f_  = vofS%mul_
+    
+	!cycle time loop
+	do while (timeloop(runTime))
+	
+		t_S = MPI_Wtime()
+
+		!update stats
+		call updateStats(stats,runTime%t_,runTime%dt_)
+		
+		do while (timeRkStep(runTime))	
+			
+			call setPressGrad(uEqn%flowCtrl_,uEqn%Ret_,rho,vofS%rhol_,vofS%mul_,&
+							  uEqn%gCH_,uEqn%fs_)
+
+			!solve momentum equation
+			call solveMomentumEqn(uEqn,u,p,mu,rho,st,c)
+
+			!solve poisson equation
+			call solvePoissonEqn(pEqn,psi,rho,u)	
+			
+			!divergence free velocity			
+#ifdef FAST_MODE
+			call makeVelocityDivFree(uEqn,u,psi,rho,pEqn%rho0_,pEqn%nl_)
+#endif
+#ifdef MG_MODE
+			call makeVelocityDivFree(uEqn,u,psi,rho)
+#endif
+
+			!set flow rate
+			call setFlowRate(uEqn%flowCtrl_,u,rho,uEqn%Q0_,runTime%dt_,&
+					         alphaRKS(runTime))
+
+			!print out continuity error
+    		call computeContinuityError(u,runTime%dt_)
+			
+			!correct pressure
+#ifdef FAST_MODE
+			call updatePressure(pEqn,p,psi)
+#endif
+#ifdef MG_MODE
+			call updatePressure(p,psi)
+#endif
+			
+		end do	
+
+		!call computeVorticity(u,w)
+
+		if (timeOutput(runTime)) then
+			INCLUDE 'writeFields_H.f90'
+		end if
+			
+		t_E = MPI_Wtime()
+		
+		if (IS_MASTER) then
+			write(*,'(A,'//s_outputFormat(2:9)//')') '	TOTAL CPU TIME: ', t_E-t_S
+		end if
+		
+	end do
+    	
+    end subroutine
+!========================================================================================!
+    
 
 END PROGRAM main	
 
