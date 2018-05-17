@@ -107,10 +107,11 @@ module vofMOD
 contains
 
 !========================================================================================!
-    subroutine vofCTOR(this,gmesh,mesh,rt)
+    subroutine vofCTOR(this,gmesh,mesh,rt,flow_solver,tpf)
         type(VOF), intent(out) :: this
         type(time), intent(in), target :: rt
         type(grid), intent(in), target :: gmesh, mesh
+        integer, intent(in) :: flow_solver,tpf
         integer :: nprocs
         type(parFile) :: pfile
         integer :: nx,ny,nz
@@ -125,9 +126,6 @@ contains
 		
 		this%hd_ = 3
 		
-		!init boxes
-		call vofBlocksCTOR(mesh,gmesh)
-		
 		!read mat props
 		call parFileCTOR(pfile ,'parameters','specs')
 		call readParameter(pfile,this%rhol_,'rhol')
@@ -136,13 +134,20 @@ contains
 		call readParameter(pfile,this%mug_,'mug')
 		call readParameter(pfile,this%sigma_,'sigma')
 		
-    	!allocate vertex field
-    	call allocateArray(s_cv,0,nx,0,ny,0,nz)
+		if (flow_solver==tpf) then
+		
+			!init boxes
+			call vofBlocksCTOR(mesh,gmesh)
+		
+    		!allocate vertex field
+    		call allocateArray(s_cv,0,nx,0,ny,0,nz)
     	
-		!store old c field
-    	call storeOldVOField()
+			!store old c field
+    		call storeOldVOField()
 
-		call updateStateBlocks(this)
+			call updateStateBlocks(this)
+			
+		end if
 		
     end subroutine
 !========================================================================================!
