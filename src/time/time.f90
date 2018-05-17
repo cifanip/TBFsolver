@@ -291,7 +291,7 @@ contains
 			
 			write(*,'(A,'//s_doubleFormat(2:10)//')') '	t  =', this%t_
 			write(*,'(A,'//s_outputFormat(2:9)//')') '	dt =  ', this%dt_
-			write(*,'(A,'//s_outputFormat(2:9)//')') '	CFL max = ', this%dt_
+			write(*,'(A,'//s_outputFormat(2:9)//')') '	CFL max = ', this%cflMax_
 
 		end if
 
