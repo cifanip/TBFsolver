@@ -444,6 +444,8 @@ contains
     	
     	
     	vofb%c(lbi:ubi,lbj:ubj,lbk:ubk) = vofb%c(lbi:ubi,lbj:ubj,lbk:ubk) - vofb%corrTerm 
+	
+	vofb%corrTerm = 0.d0
     	    	
     	call clump(vofb)
     	call updateState(this,vofb)
