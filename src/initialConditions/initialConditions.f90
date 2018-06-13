@@ -187,9 +187,9 @@ contains
 		call allocateArray(xfv,is-1,ie)
 		call allocateArray(yfv,js-1,je)
 		call allocateArray(zfv,ks-1,ke)
-		xfv=mesh%xc_(is-1:ie)
-		yfv=mesh%yc_(js-1:je)
-		zfv=mesh%zc_(ks-1:ke)
+		xfv=mesh%xf_(is-1:ie)
+		yfv=mesh%yf_(js-1:je)
+		zfv=mesh%zf_(ks-1:ke)
 		
 		call allocateArray(dxfv,is,ie)
 		call allocateArray(dyfv,js,je)
