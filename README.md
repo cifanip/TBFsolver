@@ -20,5 +20,5 @@ You can acknowledge the use of this code in any scientific publication/work usin
 
 [P. Cifani - Highly scalable DNS solver for turbulent bubble-laden channel flow](https://www.sciencedirect.com/science/article/pii/S0045793018303311)
 
-and the following DOI:
+and the following DOI: 
 [https://doi.org/10.5281/zenodo.1222098](https://doi.org/10.5281/zenodo.1222098)
