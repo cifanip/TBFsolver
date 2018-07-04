@@ -27,7 +27,7 @@ adaptiveTimeStep .T.
 cflMax 0.1d0
 
 !stats average
-computeStats .T.
+process_averages .T.
 Ts 0.d0
 
 !ramp up props
