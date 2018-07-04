@@ -72,6 +72,7 @@ module statisticsMod
 		
 		real(DP) :: nu_
 		
+		logical, private :: process_averages
 		logical, private :: isTimeAverage_, hasTimeAvStarted_
 
 		contains	
@@ -124,6 +125,7 @@ contains
 
 		call parFileCTOR(pfile,'timeControl','specs')
 		call readParameter(pfile,this%Ts_,'Ts')
+		call readParameter(pfile,this%process_averages,'process_averages')
 
 		nyg = p%ptrMesh_%nyg_
 		
@@ -214,6 +216,8 @@ contains
 		real(DP), intent(in) :: t, dt
 		real(DP) :: start,finish
 		
+		if (this%process_averages) then
+		
 		start = MPI_Wtime()  
 		
 		if (.not.this%hasTimeAvStarted_) then
@@ -239,6 +243,8 @@ contains
         finish = MPI_Wtime()
         
         call info(finish-start)
+        
+        end if
 	
 	end subroutine
 !========================================================================================!
