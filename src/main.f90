@@ -54,39 +54,17 @@ PROGRAM main
 	call timeCTOR(runTime,u,mpiCTRL)	
 	
 	t_S0 = MPI_Wtime()
-	
-	!read flow solver type
-	call parFileCTOR(file_fsolver,'flowSolver','specs')
-	call readParameter(file_fsolver,flow_solver,'flow_solver')
 
 	INCLUDE 'createFields_H.f90'
 	
-	call vofCTOR(vofS,gmesh,mesh,runTime,flow_solver,TWO_PHASE_FLOW)
-	call momentumEqnCTOR(uEqn,gMesh,mesh,u,runTime)
-#ifdef FAST_MODE
-	call poissonEqnCTOR(pEqn,mesh,gMesh,psi,runTime,vofS%rhol_,vofS%rhog_)
-#endif
-#ifdef MG_MODE
-	call poissonEqnCTOR(pEqn,mesh,cs,psi,runTime)
-#endif
+	call init_main_solver()
 
-	!build ramps
-	call rampUpPropCTOR(rhoRamp,vofS%rhog_,vofS%rhol_,vofS%rhog_)
-	call rampUpPropCTOR(muRamp,vofS%mug_,vofS%mul_,vofS%mug_)
-	call updateMaterialProps(vofS,c,cs,rho,mu)
+	call info_run_start()
 
-	call statisticsCTOR(stats,u,w,p,c,mu,vofS%mul_/vofS%rhol_,gMesh)
-	
-	if (IS_MASTER) then
-		write(*,*) ''
-		write(*,'(A,'//s_intFormat(2:3)//',A)') &
-				'INIT TIME-INTEGRATOR on ', mpiCTRL%nProcs_*N_THREADS, ' cores'
-	end if
-	
 	!***************************** FLOW SOLVER ******************************!
 	if (flow_solver==SINGLE_PHASE_FLOW) then
 		call sph_flow_solver()
-	end if
+	end if 
 
 	if (flow_solver==TWO_PHASE_FLOW) then
 		call tph_flow_solver()
@@ -98,13 +76,7 @@ PROGRAM main
 
 	t_E0 = MPI_Wtime()
 	
-	
-	if (IS_MASTER) then
-		write(*,*) ''
-		write(*,'(A,'//s_outputFormat(2:9)//')') &
-				'EXIT RUN NORMAL. SIMULATION TIME: ', t_E0-t_S0
-		!write(*,'(A)'), 'EXIT RUN NORMAL.'
-	end if
+	call info_run_end()
 	
 	
 	!clean up
@@ -117,6 +89,66 @@ PROGRAM main
 
 
 contains
+
+!========================================================================================!
+	subroutine info_run_start()
+	
+		if (IS_MASTER) then
+			write(*,*) ''
+			write(*,'(A,'//s_intFormat(2:3)//',A)') &
+					'INIT TIME-INTEGRATOR on ', mpiCTRL%nProcs_*N_THREADS, ' cores'
+		end if	
+	
+	end subroutine
+!========================================================================================!
+
+!========================================================================================!
+	subroutine info_run_end()
+	
+		if (IS_MASTER) then
+			write(*,*) ''
+			write(*,'(A,'//s_outputFormat(2:9)//')') &
+					'EXIT RUN NORMAL. SIMULATION TIME: ', t_E0-t_S0
+		end if		
+	
+	end subroutine
+!========================================================================================!
+
+!========================================================================================!
+	subroutine info_run_cpu_time()
+
+		if (IS_MASTER) then
+			write(*,'(A,'//s_outputFormat(2:9)//')') '	TOTAL CPU TIME: ', t_E-t_S
+		end if
+	
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
+	subroutine init_main_solver()
+	
+		!read flow solver type
+		call parFileCTOR(file_fsolver,'flowSolver','specs')
+		call readParameter(file_fsolver,flow_solver,'flow_solver')
+	
+		call vofCTOR(vofS,gmesh,mesh,runTime,flow_solver,TWO_PHASE_FLOW)
+		call momentumEqnCTOR(uEqn,gMesh,mesh,u,runTime)
+#ifdef FAST_MODE
+		call poissonEqnCTOR(pEqn,mesh,gMesh,psi,runTime,vofS%rhol_,vofS%rhog_)
+#endif
+#ifdef MG_MODE
+		call poissonEqnCTOR(pEqn,mesh,cs,psi,runTime)
+#endif
+
+		!build ramps
+		call rampUpPropCTOR(rhoRamp,vofS%rhog_,vofS%rhol_,vofS%rhog_)
+		call rampUpPropCTOR(muRamp,vofS%mug_,vofS%mul_,vofS%mug_)
+		call updateMaterialProps(vofS,c,cs,rho,mu)
+
+		call statisticsCTOR(stats,u,w,p,c,mu,vofS%mul_/vofS%rhol_,gMesh)
+	
+	end subroutine
+!========================================================================================!
 
 !========================================================================================!
     subroutine tph_flow_solver()
@@ -184,9 +216,7 @@ contains
 			
 		t_E = MPI_Wtime()
 		
-		if (IS_MASTER) then
-			write(*,'(A,'//s_outputFormat(2:9)//')') '	TOTAL CPU TIME: ', t_E-t_S
-		end if
+		call info_run_cpu_time()
 		
 	end do
 
@@ -254,9 +284,7 @@ contains
 			
 		t_E = MPI_Wtime()
 		
-		if (IS_MASTER) then
-			write(*,'(A,'//s_outputFormat(2:9)//')') '	TOTAL CPU TIME: ', t_E-t_S
-		end if
+		call info_run_cpu_time()
 		
 	end do
     	
