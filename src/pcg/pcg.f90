@@ -424,7 +424,7 @@ contains
 		call Mpi_Allreduce(r_l, r_g, 1, MPI_DOUBLE_PRECISION, MPI_SUM, comm, ierror)
 		call Mpi_Allreduce(q_l, q_g, 1, MPI_DOUBLE_PRECISION, MPI_SUM, comm, ierror)
 		
-		res = sqrt(r_g)/sqrt(q_g)
+		res = sqrt(r_g)/sqrt(q_g+tiny(0.d0))
 					    
 	end subroutine
 !========================================================================================!
