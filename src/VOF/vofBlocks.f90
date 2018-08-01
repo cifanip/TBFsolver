@@ -19,6 +19,7 @@
 module vofBlocksMod
 
 	use initialConditionsMod
+	use timeMod
 	
 	implicit none
 
@@ -54,6 +55,7 @@ module vofBlocksMod
 	integer, parameter :: TIME_LEVEL_0_BLK=1
 	integer, parameter :: UPDATE_BLK=2
 	integer, parameter :: REDISTRIBUTION_BLK=3
+	integer, parameter :: REINIT_BLK=4
 	
 	type, public :: vofBlock
 		integer :: master, bn
@@ -129,12 +131,13 @@ module vofBlocksMod
 contains
 
 !========================================================================================!
-    subroutine vofBlocksCTOR(mesh,gmesh)
+    subroutine vofBlocksCTOR(mesh,gmesh,rt)
     	type(grid), intent(in) :: mesh,gmesh
+    	type(time), intent(in) :: rt
     	integer :: nprocs
     
 		!init blocks
-		call initVOFblocks(mesh,gmesh)
+		call build_VOF_blocks(mesh,gmesh,rt)
 
 		nprocs=mesh%ptrMPIC_%nProcs_
     	call allocateArray(s_gbList,1,8,0,nprocs-1,1,s_nb)
@@ -153,7 +156,93 @@ contains
 		s_exchange_g(mesh%ptrMPIC_%rank_)=.FALSE.
 		s_exchange_b = .FALSE.	
 		
-     end subroutine   	
+    end subroutine   	
+!========================================================================================!
+
+!========================================================================================!
+    subroutine build_VOF_blocks(mesh,gmesh,rt)
+    	type(grid), intent(in) :: mesh,gmesh
+    	type(time), intent(in) :: rt
+    	
+    	if ((rt%t_>0.d0).OR.(rt%restart_boxes_)) then
+    		call readVOFblocks(mesh,gmesh,rt)
+    	else
+    		call initVOFblocks(mesh,gmesh)
+    	end if
+    	
+    end subroutine   	
+!========================================================================================!
+
+!========================================================================================!
+    subroutine readVOFblocks(mesh,gmesh,rt)
+    	type(grid), intent(in) :: mesh,gmesh
+    	type(time), intent(in) :: rt
+    	type(mpiControl), pointer :: mpic
+    	real(DP), allocatable, dimension(:,:,:) :: c,c0
+    	integer, dimension(6) :: idx
+    	character(len=10) :: dirName,bname
+    	real(DP) :: dummy
+    	integer :: ierror,nb_rmp,i,master,bn,nb_tmp,n_blk_max
+    	
+    	mpic => mesh%ptrMPIC_
+    	
+    	write(dirName,s_intFormat) rt%inputFold_
+    	
+    	!read s_nb
+    	if (IS_MASTER) then
+        	open(UNIT=s_IOunitNumber,FILE=adjustl(trim(dirName)//'/info_restart'),&
+        		 STATUS='old',ACTION='read')
+				read(s_IOunitNumber,s_doubleFormat) dummy
+				read(s_IOunitNumber,s_intFormat) s_nb
+			close(s_IOunitNumber) 
+		end if
+		call MPI_BCAST(s_nb, 1, MPI_INTEGER, 0, mpic%cartComm_, ierror)
+    	
+    	do i=1,s_nb
+    		
+			write(bname,s_intFormat) i
+        	open(UNIT=s_IOunitNumber,FILE=trim(adjustl(dirName))//'/b'//trim(adjustl(bname)), &
+        	 	      form='UNFORMATTED',ACCESS='STREAM',STATUS='OLD',ACTION='READ') 
+        	
+        	read(s_IOunitNumber) master
+        	
+        	if (master==mpic%rank_) then
+        		read(s_IOunitNumber) bn
+        		read(s_IOunitNumber) idx
+        		call reAllocateArray(c,idx(1)-offset_c,idx(2)+offset_c,&
+        							   idx(3)-offset_c,idx(4)+offset_c,&
+        							   idx(5)-offset_c,idx(6)+offset_c)
+        		call reAllocateArray(c0,idx(1)-offset_c,idx(2)+offset_c,&
+        							    idx(3)-offset_c,idx(4)+offset_c,&
+        							    idx(5)-offset_c,idx(6)+offset_c)
+        		read(s_IOunitNumber) c
+        		read(s_IOunitNumber) c0
+        		
+        		call addNewBlock(vofBlocks,nb_tmp)
+        		call initBlock(mesh,gmesh,vofBlocks(nb_tmp),bn,master,idx(1),idx(2),&
+        				       idx(3),idx(4),idx(5),idx(6),REINIT_BLK,c,c0) 
+        		
+        	end if	
+    		
+    	end do
+    	
+		!set number of blocks
+    	if (allocated(vofBlocks)) then
+			s_nblk = size(vofBlocks)
+		else
+			s_nblk=0
+		end if
+
+		!check max blocks per MPI_Proc
+		call Mpi_Reduce(s_nblk, n_blk_max, 1, MPI_INTEGER, MPI_MAX, 0, &
+					    mpic%cartComm_, ierror)
+		
+		if (IS_MASTER) then
+			write(*,'(A)') 'END INIT VOF BLOCKS'
+			write(*,*) 'Max number of blocks per MPI proc: ', n_blk_max
+		end if
+    	
+    end subroutine   	
 !========================================================================================!
 
 !========================================================================================!
@@ -248,6 +337,11 @@ contains
 		call deallocateArray(s_idx_init)
 		call deallocateArray(s_pos_init)
 		
+		!initialise c0 field
+		do bi=1,s_nblk
+			vofBlocks(bi)%c0=vofBlocks(bi)%c
+		end do  
+		
 		!check max blocks per MPI_Proc
 		call Mpi_Reduce(s_nblk, n_blk_max, 1, MPI_INTEGER, MPI_MAX, 0, &
 					    mpiCTRL%cartComm_, ierror)
@@ -255,8 +349,7 @@ contains
 		if (IS_MASTER) then
 			write(*,'(A)') 'END INIT VOF BLOCKS'
 			write(*,*) 'Max number of blocks per MPI proc: ', n_blk_max
-		end if
-						
+		end if			
     	
      end subroutine   	
 !========================================================================================!
@@ -341,6 +434,10 @@ contains
 			case(UPDATE_BLK,REDISTRIBUTION_BLK)
 				vofb%c(is:ie,js:je,ks:ke) = tmp_c
 				vofb%c0(is:ie,js:je,ks:ke) = tmp_c0
+				
+			case(REINIT_BLK)
+				vofb%c = tmp_c
+				vofb%c0 = tmp_c0
 
 			case default
 		end select
@@ -2585,42 +2682,26 @@ contains
     subroutine printVOFblocks(nFolder)
     	integer, intent(in) :: nFolder
         character(len=20) :: dirName,bn
-        integer :: i,lbi,ubi,lbj,ubj,lbk,ubk
+        integer :: i
         
         if (allocated(vofBlocks)) then
         
         write(dirName,s_intFormat) nFolder
         
 		do i=1,s_nblk
-		
-			lbi=vofBlocks(i)%idx(1)
-			ubi=vofBlocks(i)%idx(2)
-			lbj=vofBlocks(i)%idx(3)
-			ubj=vofBlocks(i)%idx(4)
-			lbk=vofBlocks(i)%idx(5)
-			ubk=vofBlocks(i)%idx(6)
 						
 			write(bn,s_intFormat) vofBlocks(i)%bn
         	open(UNIT=s_IOunitNumber,FILE=trim(adjustl(dirName))//'/b'//trim(adjustl(bn)), &
         	 	      form='UNFORMATTED',ACCESS='STREAM',STATUS='REPLACE',ACTION='WRITE')
-        
-        		
-        		write(s_IOunitNumber) lbi
-        		write(s_IOunitNumber) ubi
-        		write(s_IOunitNumber) lbj
-        		write(s_IOunitNumber) ubj
-        		write(s_IOunitNumber) lbk
-        		write(s_IOunitNumber) ubk
-        		
-        		write(s_IOunitNumber) vofBlocks(i)%c
-        		
-        		write(s_IOunitNumber) vofBlocks(i)%k
-        		write(s_IOunitNumber) vofBlocks(i)%stx
-        		write(s_IOunitNumber) vofBlocks(i)%sty
-        		write(s_IOunitNumber) vofBlocks(i)%stz
 
+        		write(s_IOunitNumber) vofBlocks(i)%master
+        		write(s_IOunitNumber) vofBlocks(i)%bn
+        		write(s_IOunitNumber) vofBlocks(i)%idx
+        		write(s_IOunitNumber) vofBlocks(i)%c
+        		write(s_IOunitNumber) vofBlocks(i)%c0
 			
-			close(s_IOunitNumber)			
+			close(s_IOunitNumber)	
+					
 		end do
 		
 		end if
