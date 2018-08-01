@@ -153,12 +153,9 @@ contains
 		call readParameter(this%pfile_,this%dtVOFB_,'vofBlocksRedInterval')
 		call readParameter(this%pfile_,this%restart_boxes_,'restart_boxes')
 		
-		this%tout_ = this%dtout_
 		this%iter_ = 0
 		this%writeIter_ = 0
 		this%outputFold_ = this%inputFold_
-		
-		this%tVOFB_ = this%dtVOFB_
 
 		!init time level
 		call initTimeLevel(this,mpic)	
@@ -201,6 +198,7 @@ contains
         
 		if (this%t_ >= this%Tf_ + small) then
 			isRun = .FALSE.
+			this%t_=this%t_-this%dt_
 		else
 			call info(this)
 			isRun = .TRUE.
@@ -362,15 +360,21 @@ contains
     	
     		if (this%inputFold_ == 0) then
     			this%t_ = 0.d0
+    			this%tout_ = this%dtout_
+    			this%tVOFB_ = this%dtVOFB_
     		else
         		open(UNIT=s_IOunitNumber,FILE=adjustl(trim(dirName)//'/info_restart'),&
         			 STATUS='old',ACTION='read')
 					read(s_IOunitNumber,s_doubleFormat) this%t_
-				close(s_IOunitNumber)    		
+				close(s_IOunitNumber)  
+				this%tout_ = this%dtout_+this%t_  
+				this%tVOFB_ = this%dtVOFB_+this%t_	
     		end if
     	end if
     	
     	call MPI_BCAST(this%t_, 1, MPI_DOUBLE_PRECISION, 0, mpic%cartComm_, ierror)
+    	call MPI_BCAST(this%tout_, 1, MPI_DOUBLE_PRECISION, 0, mpic%cartComm_, ierror)
+    	call MPI_BCAST(this%tVOFB_, 1, MPI_DOUBLE_PRECISION, 0, mpic%cartComm_, ierror)
     	
 
     end subroutine
