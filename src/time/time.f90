@@ -44,7 +44,7 @@ module timeMod
 		type(parFile), private :: pfile_
 		
 		!counter time iterations
-		integer, private :: iter_
+		integer :: iter_
 		
 		!input-output folder
 		integer :: inputFold_,outputFold_
@@ -62,6 +62,9 @@ module timeMod
 		
 		!redistribution VOF blocks time interval
 		real(DP), private :: tVOFB_,dtVOFB_
+		
+		!restart boxes
+		logical :: restart_boxes_
 
 
 		contains	
@@ -148,6 +151,7 @@ contains
 		call readParameter(this%pfile_,this%adaptiveTimeStep_,'adaptiveTimeStep')
 		call readParameter(this%pfile_,this%cflLim_,'cflMax')
 		call readParameter(this%pfile_,this%dtVOFB_,'vofBlocksRedInterval')
+		call readParameter(this%pfile_,this%restart_boxes_,'restart_boxes')
 		
 		this%tout_ = this%dtout_
 		this%iter_ = 0
@@ -247,8 +251,9 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-    subroutine writeTimeFolder(this)
+    subroutine writeTimeFolder(this,nb)
         type(time), intent(inout) :: this
+        integer, intent(in) :: nb
         character(len=10) :: dirName
         integer :: CSTAT
         
@@ -265,12 +270,14 @@ contains
         		call mpiABORT('mkdir on new time level failed ')
         	end if
         	
-        	call execute_command_line(adjustl('touch ./'//trim(dirName)//'/time'),CMDSTAT=CSTAT )
+        	call execute_command_line(adjustl('touch ./'//trim(dirName)//'/info_restart'),CMDSTAT=CSTAT )
 
         	
-        	!write time
-        	open(UNIT=s_IOunitNumber,FILE=trim(adjustl(dirName))//'/time',STATUS='REPLACE',ACTION='WRITE')
+        	!write time and total number of bubbles
+        	open(UNIT=s_IOunitNumber,FILE=trim(adjustl(dirName))//'/info_restart',&
+        		 STATUS='REPLACE',ACTION='WRITE')
 				write(s_IOunitNumber,s_doubleFormat) this%t_
+				write(s_IOunitNumber,s_intFormat) nb
 			close(s_IOunitNumber)
 
         
@@ -356,7 +363,8 @@ contains
     		if (this%inputFold_ == 0) then
     			this%t_ = 0.d0
     		else
-        		open(UNIT=s_IOunitNumber,FILE=adjustl(trim(dirName)//'/time'),STATUS='old',ACTION='read')
+        		open(UNIT=s_IOunitNumber,FILE=adjustl(trim(dirName)//'/info_restart'),&
+        			 STATUS='old',ACTION='read')
 					read(s_IOunitNumber,s_doubleFormat) this%t_
 				close(s_IOunitNumber)    		
     		end if
