@@ -17,14 +17,16 @@
 ! ************************************************************************************** !
 
 !reconstruct and write fields
-call writeTimeFolder(runTime)
+call writeTimeFolder(runTime,s_nb)
 
 call reconstructAndWriteField(c,gc,runTime%outputFold_)
 call reconstructAndWriteField(cs,gcs,runTime%outputFold_)
 call reconstructAndWriteField(curv,gcurv,runTime%outputFold_)
 call reconstructAndWriteField(p,gp,runTime%outputFold_)
+call reconstructAndWriteField(psi,gpsi,runTime%outputFold_)
 call reconstructAndWriteFieldV(u,gu,runTime%outputFold_)
-call reconstructAndWriteFieldV(st,gst,runTime%outputFold_)
+!call reconstructAndWriteFieldV(st,gst,runTime%outputFold_)
+call reconstructAndWriteFieldV(w,gw,runTime%outputFold_)
 
 !write old time fluxes
 call printOldTimeFlux(uEqn,runTime%scheme_,runTime%outputFold_)
@@ -32,5 +34,5 @@ call printOldTimeFlux(uEqn,runTime%scheme_,runTime%outputFold_)
 !write stats
 call writeStats(stats,runTime%outputFold_)
 
-!uncomment to write boxes: make sure every MPI proc can see and write in the main folder.
-!call printVOFblocks(runTime%outputFold_)
+!write boxes: make sure every MPI proc can read and write in the main folder.
+call printVOFblocks(runTime%outputFold_)
