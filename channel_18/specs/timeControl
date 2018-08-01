@@ -36,3 +36,6 @@ isRampUp .F.
 
 !vof blocks redistribution
 vofBlocksRedInterval 1.d-1
+
+!vof blocks re-initialization
+restart_boxes .F.
