@@ -137,13 +137,10 @@ contains
 		if (flow_solver==tpf) then
 		
 			!init boxes
-			call vofBlocksCTOR(mesh,gmesh)
+			call vofBlocksCTOR(mesh,gmesh,rt)
 		
     		!allocate vertex field
     		call allocateArray(s_cv,0,nx,0,ny,0,nz)
-    	
-			!store old c field
-    		call storeOldVOField()
 
 			call updateStateBlocks(this)
 			
@@ -240,23 +237,17 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-    subroutine cnp()
+    subroutine cnp(this)
+    	type(VOF), intent(in) :: this
     	integer :: b
     	
-		do b=1,s_nblk
-			vofBlocks(b)%c=vofBlocks(b)%c0
-		end do 	 			
-    
-    end subroutine
-!========================================================================================!
+    	if (this%ptrTime_%iter_>1) then
 
-!========================================================================================!
-    subroutine storeOldVOField()
-    	integer :: b
-    	
-		do b=1,s_nblk
-			vofBlocks(b)%c0=vofBlocks(b)%c
-		end do  		
+			do b=1,s_nblk
+				vofBlocks(b)%c=vofBlocks(b)%c0
+			end do 	
+		 	
+		end if		
     
     end subroutine
 !========================================================================================!
@@ -272,7 +263,7 @@ contains
     	start = MPI_Wtime()
     	
     	!set c=c^{n+1}
-    	call cnp()
+    	call cnp(this)
 
 		call sweepCombination()
 		
