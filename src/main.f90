@@ -208,7 +208,7 @@ contains
 			
 		end do	
 
-		!call computeVorticity(u,w)
+		call computeVorticity(u,w)
 
 		if (timeOutput(runTime)) then
 			INCLUDE 'writeFields_H.f90'
@@ -276,7 +276,7 @@ contains
 			
 		end do	
 
-		!call computeVorticity(u,w)
+		call computeVorticity(u,w)
 
 		if (timeOutput(runTime)) then
 			INCLUDE 'writeFields_H.f90'
