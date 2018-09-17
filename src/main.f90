@@ -151,6 +151,19 @@ contains
 !========================================================================================!
 
 !========================================================================================!
+	subroutine reset_matprops_sph()
+	
+    	c%f_   = 0.d0
+    	cs%f_  = 0.d0
+    	vofS%rhog_ = vofS%rhol_
+    	vofS%mug_ = vofS%mul_
+    	rho%f_ = vofS%rhol_
+    	mu%f_  = vofS%mul_	
+	
+	end subroutine
+!========================================================================================!
+
+!========================================================================================!
     subroutine tph_flow_solver()
 
 	!cycle time loop
@@ -227,10 +240,7 @@ contains
 !========================================================================================!
     subroutine sph_flow_solver()
     
-    c%f_   = 0.d0
-    cs%f_  = 0.d0
-    rho%f_ = vofS%rhol_
-    mu%f_  = vofS%mul_
+	call reset_matprops_sph()
     
 	!cycle time loop
 	do while (timeloop(runTime))
