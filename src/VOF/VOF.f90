@@ -69,7 +69,8 @@ module vofMOD
 	private :: updateState
 	private :: updateStateBlocks
 	private :: reSetFullEmpty
-	private :: clump
+	private :: cut_off_vf
+	private :: cut_off_k
 	private :: sweepCombination
 	private :: info
 	private :: resetFragments
@@ -413,7 +414,7 @@ contains
     	vofb%corrTerm = vofb%corrTerm + vofb%c(lbi:ubi,lbj:ubj,lbk:ubk)*vofb%corrFlux
 
     	
-    	call clump(vofb)
+    	call cut_off_vf(vofb)
     	call updateState(this,vofb)
     	call reSetFullEmpty(vofb)
     	
@@ -438,7 +439,7 @@ contains
 	
 	vofb%corrTerm = 0.d0
     	    	
-    	call clump(vofb)
+    	call cut_off_vf(vofb)
     	call updateState(this,vofb)
     	call reSetFullEmpty(vofb)
 
@@ -787,7 +788,7 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-    subroutine clump(vofb)
+    subroutine cut_off_vf(vofb)
     	type(vofBlock), intent(inout) :: vofb
     	integer :: lbi, ubi, lbj, ubj, lbk, ubk
     	integer :: i,j,k
@@ -1678,6 +1679,27 @@ contains
 !========================================================================================!
 
 !========================================================================================!
+    subroutine cut_off_k(vofb,k)
+        type(vofBlock), intent(in) :: vofb
+        real(DP), intent(inout) :: k
+        real(DP) :: dx,dy,dz,dm,klim
+        real(DP), dimension(3) :: d
+        
+        dx=minval(vofb%dxc)
+        dy=minval(vofb%dyc)
+        dz=minval(vofb%dzc)
+        d=(/dx,dy,dz/)
+        dm=minval(d)
+        klim=1.d0/dm
+        
+        if (abs(k)>klim) then
+        	k=sign(klim,k)
+        end if
+        
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
     subroutine hfColumn(vofb,m,dir,i,j,k,cn,h,lb,posi,isValid)
         type(vofBlock), intent(in) :: vofb
         real(DP),intent(in) :: m
@@ -1860,7 +1882,7 @@ contains
         real(DP), intent(in) :: m
         real(DP), dimension(9), intent(inout) :: h
         integer, dimension(9), intent(inout) :: lb
-		real(DP) :: dhxx, dhyy, dhxy, dhx, dhy, denom, num
+		real(DP) :: dhxx, dhyy, dhxy, dhx, dhy, denom, num, k_val
 		integer :: lmax
 		integer :: nc,n1,n2,dir1,dir2
 		integer :: q
@@ -1934,9 +1956,10 @@ contains
 		!3D curvature
 		num = dhxx*(1.d0+dhy*dhy)+dhyy*(1.d0+dhx*dhx)-2.d0*dhxy*dhx*dhy
 		denom = (1.d0+dhx*dhx+dhy*dhy)*sqrt(1.d0+dhx*dhx+dhy*dhy)
-		vofb%k(i,j,k) = -num/denom
-
-		
+		k_val = -num/denom
+		call cut_off_k(vofb,k_val)
+		vofb%k(i,j,k) = k_val
+	
     end subroutine
 !========================================================================================!
 
@@ -2277,7 +2300,7 @@ contains
     	real(DP), dimension(3) :: m,ds,c0
 		real(DP), dimension(6,6) :: A
 		real(DP), dimension(6) :: b
-    	real(DP) :: num,denom,r
+    	real(DP) :: num,denom,r,k_val
     	integer :: np, lab_c0
     	logical :: enoughPoints,singular
     	
@@ -2303,7 +2326,9 @@ contains
 				num=b(1)*(1.d0+b(5)*b(5))+b(2)*(1.d0+b(4)*b(4))-b(3)*b(4)*b(5)
 				r=1.d0+b(4)*b(4)+b(5)*b(5)
 				denom=r*sqrt(r)
-				vofb%k(i,j,k)=-2.d0*num/denom
+				k_val=-2.d0*num/denom
+				call cut_off_k(vofb,k_val)
+				vofb%k(i,j,k)=k_val
 			end if
 		else
 			failed = .TRUE.
@@ -2321,7 +2346,7 @@ contains
         integer, intent(in) :: i,j,k
         real(DP), dimension(3) :: nihp,nihm,njhp,njhm,nkhp,nkhm
         real(DP) :: uihp,uihm,ujhp,ujhm,ukhp,ukhm
-        real(DP) :: dx, dy, dz
+        real(DP) :: dx, dy, dz, k_val
 
 		!normal vector
 		!face i+1/2
@@ -2412,9 +2437,9 @@ contains
 		dy = vofb%dyf(j)
 		dz = vofb%dzf(k)
 		
-		vofb%k(i,j,k) = -( (uihp-uihm)/dx + (ujhp-ujhm)/dy + (ukhp-ukhm)/dz )
-		
-		
+		k_val = -( (uihp-uihm)/dx + (ujhp-ujhm)/dy + (ukhp-ukhm)/dz )
+		call cut_off_k(vofb,k_val)	
+		vofb%k(i,j,k) = k_val
 		
     end subroutine
 !========================================================================================!
