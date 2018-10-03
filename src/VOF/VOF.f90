@@ -28,6 +28,9 @@ module vofMOD
 	integer, protected :: s_sweepSelector = 0
 	integer, dimension(3), protected :: s_sweep
 	
+	real(DP), protected :: s_vf0_total
+	integer, protected :: s_reset_vf_counter = 0
+	
 	type, public :: VOF
 	
 		type(grid), pointer :: mesh_ => NULL()
@@ -59,6 +62,9 @@ module vofMOD
 	private :: cnh
 	private :: cnp
 	private :: storeOldVOField
+	private :: compute_total_vf
+	private :: compute_blk_vf
+	private :: check_mass_loss
 	private :: reconstruct
 	private :: reconstruct_blocks
 	private :: implicitIntegratorAndUpdateCorrTerm
@@ -72,8 +78,10 @@ module vofMOD
 	private :: cut_off_vf
 	private :: cut_off_k
 	private :: sweepCombination
+	private :: update_reset_vf_counter
 	private :: info
 	private :: resetFragments
+	private :: resetSatellites
 	private :: computeNormal_sharp
 	private :: computeNormal_smooth
 	private :: computeNormal_youngs
@@ -144,6 +152,9 @@ contains
     		call allocateArray(s_cv,0,nx,0,ny,0,nz)
 
 			call updateStateBlocks(this)
+			
+			!compute initial tot volume-fraction
+			call compute_total_vf(this,s_vf0_total)
 			
 		end if
 		
@@ -216,6 +227,69 @@ contains
 !========================================================================================!
 
 !========================================================================================!
+    subroutine check_mass_loss(this)
+    	type(VOF), intent(in) :: this
+    	real(DP) :: vf_total,m_loss
+        
+        call compute_total_vf(this,vf_total)
+        
+        if (IS_MASTER) then
+        	m_loss=abs(vf_total-s_vf0_total)/s_vf0_total
+        	write(*,'(A,'//s_outputFormat(2:9)//')') '	relative mass loss: ', m_loss
+        end if
+
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
+    subroutine compute_total_vf(this,vf_totg)
+    	type(VOF), intent(in) :: this
+    	real(DP), intent(out) :: vf_totg
+    	real(DP) :: vf_tot,vf
+    	integer :: i,ierror
+    
+    	vf_tot=0.d0
+    	do i=1,s_nblk
+    		call compute_blk_vf(vofBlocks(i),vf)
+    		vf_tot=vf_tot+vf
+    	end do
+    	
+		call Mpi_reduce(vf_tot, vf_totg, 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0,&
+		                this%mesh_%ptrMPIC_%cartComm_,ierror)
+    
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
+    subroutine compute_blk_vf(vofb,vf)
+    	type(vofBlock), intent(in) :: vofb
+    	real(DP), intent(out) :: vf
+    	integer :: i,j,k,is,ie,js,je,ks,ke
+    	real(DP) :: dx,dy,dz
+    	
+    	is=vofb%idx(1)
+    	ie=vofb%idx(2)
+    	js=vofb%idx(3)
+    	je=vofb%idx(4)
+    	ks=vofb%idx(5)
+    	ke=vofb%idx(6)
+    	
+    	vf=0.d0
+    	do i=is,ie
+    		do j=js,je
+    			do k=ks,ke
+    				dx=vofb%dxf(i)
+    				dy=vofb%dyf(j)
+    				dz=vofb%dzf(k)
+    				vf=vf+vofb%c(i,j,k)*dx*dy*dz
+    			end do
+    		end do
+    	end do
+    	
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
     subroutine cnh(vofb)
     	type(vofBlock), intent(inout) :: vofb
     	real(DP), allocatable, dimension(:,:,:) :: tmp
@@ -260,13 +334,14 @@ contains
     	type(vfield), intent(in) :: u
     	integer :: i,b
     	real(DP) :: start, finish
-    	
+
     	start = MPI_Wtime()
     	
     	!set c=c^{n+1}
     	call cnp(this)
 
 		call sweepCombination()
+		call update_reset_vf_counter()
 		
 		!exchange velocity field
 		call grid_2_boxes_u(this%mesh_,u)
@@ -293,7 +368,7 @@ contains
 			end do
 		
 			call explicitIntegrator(this,vofBlocks(b))	
-			call resetFragments(vofBlocks(b))
+			call resetSatellites(vofBlocks(b))
 			!compute c^{n=1/2}
 			call cnh(vofBlocks(b))	
 			call updateBlock(this%mesh_,this%gmesh_,vofBlocks(b),b)
@@ -858,6 +933,17 @@ contains
 !========================================================================================!
 
 !========================================================================================!
+    subroutine update_reset_vf_counter()
+
+        s_reset_vf_counter=s_reset_vf_counter+1
+        if (s_reset_vf_counter > 10) then
+        	s_reset_vf_counter=1
+        end if
+        
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
     subroutine info(this,cpuTime,sw)
     	type(VOF), intent(in) :: this
     	real(DP), intent(in) :: cpuTime
@@ -871,10 +957,13 @@ contains
     	call Mpi_Reduce(cpuTime, cpuTime_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, 0, &
     			        comm%cartComm_, ierror)
 
-		if (IS_MASTER) then
-			if (sw==0) then
+		if (sw==0) then
+			if (IS_MASTER) then
 				write(*,'(A,'//s_outputFormat(2:9)//')') '	VOF Eqn: CPU time = ', cpuTime_max
-			else
+			end if
+			call check_mass_loss(this)
+		else
+			if (IS_MASTER) then
 				write(*,'(A,'//s_outputFormat(2:9)//')') '	St upd: CPU TIME = ', cpuTime_max
 			end if
 		end if
@@ -890,6 +979,10 @@ contains
 		integer :: i,j,k,ii,jj,kk
 		logical :: isFrag
 
+        !check re-set counter
+        if (s_reset_vf_counter <= 9) then
+        	return
+        end if
 		
 		is=vofb%idx(1)
 		ie=vofb%idx(2)
@@ -928,6 +1021,105 @@ contains
 			end do
 		end do
 		
+    end subroutine   	
+!========================================================================================!
+
+!========================================================================================!
+    subroutine resetSatellites(vofb)
+    	type(vofBlock), intent(inout) :: vofb
+        integer :: i,j,k,is,ie,js,je,ks,ke,lav,count_1,count_2
+
+        !check re-set counter
+        if (s_reset_vf_counter <= 9) then
+        	return
+        end if
+        
+		is=vofb%idx(1)
+		ie=vofb%idx(2)
+		js=vofb%idx(3)
+		je=vofb%idx(4)
+		ks=vofb%idx(5)
+		ke=vofb%idx(6)
+		
+		lev=0
+		vofb%lab=0
+    	
+    	!tag
+		do k=ks,ke
+			do j=js,je
+				do i=is,ie
+					if (((vofb%isMixed(i,j,k)).OR.(vofb%isFull(i,j,k)))&
+					     .AND.(vofb%lab(i,j,k)==0)) then				
+						lev=lev+1
+						call tag_cells(vofb,i,j,k,lev)
+					end if
+				end do
+			end do
+		end do		  	
+    	
+    	!count and delete
+    	count_1=0
+    	count_2=0
+		do k=ks,ke
+			do j=js,je
+				do i=is,ie
+					if (vofb%lab(i,j,k)==1) then
+						count_1=count_1+1
+					else if (vofb%lab(i,j,k)==2) then
+						count_2=count_2+1
+					end if
+				end do
+			end do
+		end do  
+    	
+    	if (count_1>=count_2) then
+			do k=ks,ke
+				do j=js,je
+					do i=is,ie
+						if (vofb%lab(i,j,k)==2) then
+							vofb%c(i,j,k)=0.d0
+							vofb%isMixed(i,j,k)=.FALSE.
+							vofb%isFull(i,j,k)=.FALSE.							
+						end if
+					end do
+				end do
+			end do 				    		
+    	else
+ 			do k=ks,ke
+				do j=js,je
+					do i=is,ie
+						if (vofb%lab(i,j,k)==1) then
+							vofb%c(i,j,k)=0.d0
+							vofb%isMixed(i,j,k)=.FALSE.
+							vofb%isFull(i,j,k)=.FALSE.							
+						end if
+					end do
+				end do
+			end do    	
+    	end if
+    	
+    end subroutine   	
+!========================================================================================!
+
+!========================================================================================!
+    recursive subroutine tag_cells(vofb,i,j,k,lev)
+    	type(vofBlock), intent(inout) :: vofb
+    	integer, intent(in) :: i,j,k,lev
+    	integer :: ii,jj,kk
+    	
+    	vofb%lab(i,j,k)=lev
+    	
+		do kk=k-1,k+1
+			do jj=j-1,j+1
+				do ii=i-1,i+1
+					if (((vofb%isMixed(ii,jj,kk)).OR.(vofb%isFull(ii,jj,kk)))&
+					     .AND.(vofb%lab(ii,jj,kk)==0)) then
+						call tag_cells(vofb,ii,jj,kk,lev)
+					end if	
+				end do
+			end do
+		end do    	
+    	 	
     end subroutine   	
 !========================================================================================!
 
