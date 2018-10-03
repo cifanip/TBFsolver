@@ -93,6 +93,7 @@ module allocateArraysMod
   	
 	interface assignArray
 		module PROCEDURE assignArray1D_integer
+		module PROCEDURE assignArray3D_integer
 		module PROCEDURE assignArray3D_double
 		module PROCEDURE assignArray3D_logical
   	end interface
@@ -834,6 +835,31 @@ contains
 			en1=ubound(rhs,1)
 			
 			call reAllocateArray(lhs,st1,en1)
+			lhs=rhs
+			
+		else
+			call mpiABORT('Attempt to assign to a deallocated array ') 
+		end if
+		
+	end subroutine
+!========================================================================================!
+
+!========================================================================================!
+	subroutine assignArray3D_integer(lhs,rhs) 
+		integer, allocatable, dimension(:,:,:), intent(INOUT) :: lhs
+		integer, allocatable, dimension(:,:,:), intent(IN) :: rhs
+		integer :: st1,en1,st2,en2,st3,en3
+		
+		if (allocated(rhs)) then
+			
+			st1=lbound(rhs,1)
+			st2=lbound(rhs,2)
+			st3=lbound(rhs,3)
+			en1=ubound(rhs,1)
+			en2=ubound(rhs,2)
+			en3=ubound(rhs,3)
+			
+			call reAllocateArray(lhs,st1,en1,st2,en2,st3,en3)
 			lhs=rhs
 			
 		else
