@@ -82,7 +82,6 @@ module vofBlocksMod
 		logical, allocatable, dimension(:,:,:) :: isMixed, isFull
 		real(DP), allocatable, dimension(:,:,:) :: q
 		real(DP), allocatable, dimension(:,:,:) :: geoFlux, corrFlux, corrTerm
-		integer, allocatable, dimension(:,:,:) :: lab
 	end type
 	
     interface assignment(=)
@@ -596,8 +595,7 @@ contains
 										   ks-offset_u,ke+offset_u)
 		call reAllocateArray(vofb%corrTerm,is-offset_u,ie+offset_u,	&
 										   js-offset_u,je+offset_u,	&
-										   ks-offset_u,ke+offset_u)
-		call reAllocateArray(vofb%lab,is-1,ie+1,js-1,je+1,ks-1,ke+1)  	
+										   ks-offset_u,ke+offset_u)   	
 
      end subroutine   	
 !========================================================================================!
@@ -700,7 +698,6 @@ contains
 		call assignArray(lhs%geoFlux,rhs%geoFlux)
 		call assignArray(lhs%corrFlux,rhs%corrFlux)
 		call assignArray(lhs%corrTerm,rhs%corrTerm)
-		call assignArray(lhs%lab,rhs%lab)
 
 		lb=lbound(rhs%xc,1)
 		ub=ubound(rhs%xc,1)
