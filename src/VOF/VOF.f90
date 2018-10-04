@@ -1027,6 +1027,7 @@ contains
 !========================================================================================!
     subroutine resetSatellites(vofb)
     	type(vofBlock), intent(inout) :: vofb
+    	integer, allocatable, dimension(:,:,:) :: lab
         integer :: i,j,k,is,ie,js,je,ks,ke,lav,count_1,count_2
 
         !check re-set counter
@@ -1041,17 +1042,19 @@ contains
 		ks=vofb%idx(5)
 		ke=vofb%idx(6)
 		
+		call reAllocateArray(lab,is-1,ie+1,js-1,je+1,ks-1,ke+1)
+		
 		lev=0
-		vofb%lab=0
+		lab=0
     	
     	!tag
 		do k=ks,ke
 			do j=js,je
 				do i=is,ie
 					if (((vofb%isMixed(i,j,k)).OR.(vofb%isFull(i,j,k)))&
-					     .AND.(vofb%lab(i,j,k)==0)) then				
+					     .AND.(lab(i,j,k)==0)) then				
 						lev=lev+1
-						call tag_cells(vofb,i,j,k,lev)
+						call tag_cells(vofb,i,j,k,lev,lab)
 					end if
 				end do
 			end do
@@ -1063,9 +1066,9 @@ contains
 		do k=ks,ke
 			do j=js,je
 				do i=is,ie
-					if (vofb%lab(i,j,k)==1) then
+					if (lab(i,j,k)==1) then
 						count_1=count_1+1
-					else if (vofb%lab(i,j,k)==2) then
+					else if (lab(i,j,k)==2) then
 						count_2=count_2+1
 					end if
 				end do
@@ -1076,7 +1079,7 @@ contains
 			do k=ks,ke
 				do j=js,je
 					do i=is,ie
-						if (vofb%lab(i,j,k)==2) then
+						if (lab(i,j,k)==2) then
 							vofb%c(i,j,k)=0.d0
 							vofb%isMixed(i,j,k)=.FALSE.
 							vofb%isFull(i,j,k)=.FALSE.							
@@ -1088,7 +1091,7 @@ contains
  			do k=ks,ke
 				do j=js,je
 					do i=is,ie
-						if (vofb%lab(i,j,k)==1) then
+						if (lab(i,j,k)==1) then
 							vofb%c(i,j,k)=0.d0
 							vofb%isMixed(i,j,k)=.FALSE.
 							vofb%isFull(i,j,k)=.FALSE.							
@@ -1098,23 +1101,26 @@ contains
 			end do    	
     	end if
     	
+    	call deallocateArray(lab)
+    	
     end subroutine   	
 !========================================================================================!
 
 !========================================================================================!
-    recursive subroutine tag_cells(vofb,i,j,k,lev)
+    recursive subroutine tag_cells(vofb,i,j,k,lev,lab)
     	type(vofBlock), intent(inout) :: vofb
     	integer, intent(in) :: i,j,k,lev
+    	integer, allocatable, dimension(:,:,:), intent(inout) :: lab
     	integer :: ii,jj,kk
     	
-    	vofb%lab(i,j,k)=lev
+    	lab(i,j,k)=lev
     	
 		do kk=k-1,k+1
 			do jj=j-1,j+1
 				do ii=i-1,i+1
 					if (((vofb%isMixed(ii,jj,kk)).OR.(vofb%isFull(ii,jj,kk)))&
-					     .AND.(vofb%lab(ii,jj,kk)==0)) then
-						call tag_cells(vofb,ii,jj,kk,lev)
+					     .AND.(lab(ii,jj,kk)==0)) then
+						call tag_cells(vofb,ii,jj,kk,lev,lab)
 					end if	
 				end do
 			end do
