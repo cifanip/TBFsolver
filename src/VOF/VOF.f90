@@ -66,6 +66,7 @@ module vofMOD
 	private :: compute_blk_vf
 	private :: check_mass_loss
 	private :: reconstruct
+	private :: search_full_interface_cells
 	private :: reconstruct_blocks
 	private :: implicitIntegratorAndUpdateCorrTerm
 	private :: explicitIntegrator
@@ -423,12 +424,10 @@ contains
 		lbk = lbound(vofb%q,3)
 		ubk = ubound(vofb%q,3)
 		
-
-		!not needed
-        call smoothVFblock(vofb)
+		!search for interface full cells
+		call search_full_interface_cells(this,vofb)
     	
 		call computeNormal_youngs(this,vofb)
-		!call computeNormal_sharp(this,vofb)
 		
     	do k=lbk,ubk
     		do j=lbj,ubj
@@ -455,6 +454,71 @@ contains
     		end do
     	end do		
     
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
+    subroutine search_full_interface_cells(this,vofb)
+    	type(VOF), intent(in) :: this
+    	type(vofBlock), intent(inout) :: vofb
+    	integer :: lbi,ubi,lbj,ubj,lbk,ubk,i,j,k
+    	real(DP) :: swx,swy,swz
+    	logical :: full_inter_found
+    	
+		lbi = lbound(vofb%c,1)
+		ubi = ubound(vofb%c,1)
+		lbj = lbound(vofb%c,2)
+		ubj = ubound(vofb%c,2)
+		lbk = lbound(vofb%c,3)
+		ubk = ubound(vofb%c,3) 	
+		
+    	do k=lbk+1,ubk-1
+    		do j=lbj+1,ubj-1
+    			do i=lbi+1,ubi-1
+    				
+    				if (vofb%isFull(i,j,k)) then
+    				
+    					full_inter_found=.FALSE.
+    				
+    					!check direct 6 neighbours
+    					!right
+    					if ((.NOT.(vofb%isFull(i+1,j,k))).AND.&
+    					   (.NOT.(vofb%isMixed(i+1,j,k)))) then
+							full_inter_found=.TRUE.
+						!left	
+    					else if ((.NOT.(vofb%isFull(i-1,j,k))).AND.&
+    					   (.NOT.(vofb%isMixed(i-1,j,k)))) then
+							full_inter_found=.TRUE.
+						!top	
+    					else if ((.NOT.(vofb%isFull(i,j+1,k))).AND.&
+    					   (.NOT.(vofb%isMixed(i,j+1,k)))) then
+							full_inter_found=.TRUE.
+						!bottom	
+    					else if ((.NOT.(vofb%isFull(i,j-1,k))).AND.&
+    					   (.NOT.(vofb%isMixed(i,j-1,k)))) then
+							full_inter_found=.TRUE.
+						!front
+    					else if ((.NOT.(vofb%isFull(i,j,k+1))).AND.&
+    					   (.NOT.(vofb%isMixed(i,j,k+1)))) then
+							full_inter_found=.TRUE.
+						!back
+    					else if ((.NOT.(vofb%isFull(i,j,k-1))).AND.&
+    					   (.NOT.(vofb%isMixed(i,j,k-1)))) then
+							full_inter_found=.TRUE.
+    					end if
+    				
+    					if (full_inter_found) then
+							vofb%c(i,j,k)=1.d0-2.d0*this%eps_		
+							vofb%isFull(i,j,k)=.FALSE.
+							vofb%isMixed(i,j,k)=.TRUE.
+						end if
+					
+					end if
+    				
+    			end do
+    		end do
+		end do	
+    	
     end subroutine
 !========================================================================================!
 
