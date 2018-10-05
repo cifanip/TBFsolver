@@ -1042,7 +1042,7 @@ contains
 		ks=vofb%idx(5)
 		ke=vofb%idx(6)
 		
-		call reAllocateArray(lab,is-1,ie+1,js-1,je+1,ks-1,ke+1)
+		call reAllocateArray(lab,is-2,ie+2,js-2,je+2,ks-2,ke+2)
 		
 		lev=0
 		lab=0
