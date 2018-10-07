@@ -94,6 +94,7 @@ contains
         type(vfield), intent(in) :: u
         type(time), intent(in), target :: rt
         type(parFile) :: pfile_conv, pfile_flow, pfile_g
+        logical :: read_mfr
         
         call parFileCTOR(pfile_conv,'schemes','specs')
         !read k convection scheme parameter
@@ -129,7 +130,13 @@ contains
         end if
         
         if (this%flowCtrl_==2) then
-        	call computeFlowRate(u,this%Q0_)      	
+        	call readParameter(pfile_flow,read_mfr,'read_mass_flow_rare')
+        	if (read_mfr) then
+        		call readParameter(pfile_flow,this%Q0_,'mfr')
+        		this%Q0_=this%Q0_*mesh%Lxg_*mesh%Lzg_
+        	else
+        		call computeFlowRate(u,this%Q0_)
+        	end if
         end if
         
         !read gravity
