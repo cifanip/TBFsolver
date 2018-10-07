@@ -21,11 +21,7 @@ module initialConditionsMod
 	use vfieldMod
 
 	implicit none
-	
-	!initial velocity profile ch flow coefficients
-	!real(DP), parameter :: s_icA = 22.5d0
-	real(DP), parameter :: s_icA = 1.d0
-	real(DP), parameter :: s_icB = s_icA/10.d0
+
 	real(DP), parameter :: pi = 4.d0*DATAN(1.d0)
 	
 	public :: initChFlowVelocity
@@ -41,7 +37,18 @@ contains
     	type(grid), intent(in) :: mesh
     	real(DP) :: Lx, Ly, Lz
     	integer :: i, j, k
-    	real(DP) :: x, y, z
+    	real(DP) :: x, y, z, icA, icB
+    	type(parFile) :: pfile
+    	logical :: found
+    	
+    	call parFileCTOR(pfile,'initVelocity','specs')
+    	call readParameter(pfile,found,'perturbed_parabolic',bcast=.FALSE.)
+    	if (found) then
+    		call readParameter(pfile,icA,'icA',bcast=.FALSE.)
+    		icB = icA/10.d0
+    	else
+    		return
+    	end if
     	
     	Lx = mesh%Lx_
     	Ly = mesh%Ly_
@@ -56,9 +63,9 @@ contains
 					y = mesh%yc_(j)
 					z = mesh%zc_(k)
 					
-					u%ux_%f_(i,j,k) = s_icA*y*(Ly-y) + &
-									  s_icB*cos(2.d0*pi*x/Lx)*sin(2.d0*pi*y/Ly)*sin(2.d0*pi*z/Lz) + &
-									  s_icB*cos(4.d0*pi*x/Lx)*sin(4.d0*pi*y/Ly)*sin(4.d0*pi*z/Lz)
+					u%ux_%f_(i,j,k) = icA*y*(Ly-y) + &
+									  icB*cos(2.d0*pi*x/Lx)*sin(2.d0*pi*y/Ly)*sin(2.d0*pi*z/Lz) + &
+									  icB*cos(4.d0*pi*x/Lx)*sin(4.d0*pi*y/Ly)*sin(4.d0*pi*z/Lz)
 				
 				end do
 			end do
@@ -73,7 +80,7 @@ contains
 					y = mesh%yf_(j)
 					z = mesh%zc_(k)
 					
-					u%uy_%f_(i,j,k) = -(s_icB*Ly)/(2.d0*Lx)* &
+					u%uy_%f_(i,j,k) = -(icB*Ly)/(2.d0*Lx)* &
 					   				  (sin(2.d0*pi*x/Lx)*(-1.d0+cos(2.d0*pi*y/Ly))*sin(2.d0*pi*z/Lz)+ &
 					   				   sin(4.d0*pi*x/Lx)*(-1.d0+cos(4.d0*pi*y/Ly))*sin(4.d0*pi*z/Lz))
 				
@@ -90,7 +97,7 @@ contains
 					y = mesh%yc_(j)
 					z = mesh%zf_(k)
 					
-					u%uz_%f_(i,j,k) = -(s_icB*Lz)/(2.d0*Lx)* &
+					u%uz_%f_(i,j,k) = -(icB*Lz)/(2.d0*Lx)* &
 					   				  (sin(2.d0*pi*x/Lx)*sin(2.d0*pi*y/Ly)*cos(2.d0*pi*z/Lz)+ &
 					   				   sin(4.d0*pi*x/Lx)*sin(4.d0*pi*y/Ly)*cos(4.d0*pi*z/Lz))
 				
