@@ -66,9 +66,7 @@ call decomposeField(gpsi,psi)
 !init velocity
 if (IS_MASTER) then
 	call vfieldCTOR(gu,'u',gMesh,'sx','sy','sz',2,initOpt=1,nFolder=runTime%inputFold_)
-	!********************************!
-	!call initChFlowVelocity(gu,gMesh)
-	!********************************!
+	call initChFlowVelocity(gu,gMesh)
 end if
 call vfieldCTOR(u,'u',mesh,'sx','sy','sz',2,initOpt=-1)
 call decomposeFieldV(gu,u)
