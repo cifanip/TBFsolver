@@ -17,5 +17,5 @@
 !    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ! ************************************************************************************** !
 
-perturbed_parabolic .TRUE.
+perturbed_parabolic .FALSE.
 icA 22.5d0
