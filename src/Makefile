@@ -30,13 +30,12 @@ OMP_FLAG = -fopenmp
 #optimal 
 FLAGS = -O2 -fbacktrace
 
-
 ifeq ($(POIS_OPT),MG_MODE)
-OBJS = kinds.o formats.o interpolation.o initMpiGvar.o ompRoutines.o errorHandler.o allocateArrays.o mpiControl.o \
-grid.o parFile.o field.o rbgs.o poissMat.o multiGrid.o vfield.o momentumEqn.o vofBlocks.o \
+OBJS = solverTypes.o kinds.o formats.o interpolation.o initMpiGvar.o ompRoutines.o errorHandler.o allocateArrays.o 
+mpiControl.o grid.o parFile.o field.o rbgs.o poissMat.o multiGrid.o vfield.o momentumEqn.o vofBlocks.o \
 poissonEqn.o time.o auxiliaryRoutines.o initialConditions.o VOF.o statistics.o pcg.o rampUpProp.o main.o
 else ifeq ($(POIS_OPT),FAST_MODE)
-OBJS = kinds.o formats.o interpolation.o initMpiGvar.o ompRoutines.o errorHandler.o allocateArrays.o \
+OBJS = solverTypes.o kinds.o formats.o interpolation.o initMpiGvar.o ompRoutines.o errorHandler.o allocateArrays.o \
 mpiControl.o grid.o parFile.o field.o vfield.o momentumEqn.o poissonEqn.o time.o vofBlocks.o \
 auxiliaryRoutines.o initialConditions.o statistics.o pencilDec.o fastPoissonSolver.o VOF.o rampUpProp.o main.o
 endif
@@ -48,6 +47,9 @@ else ifeq ($(POIS_OPT),FAST_MODE)
 $(EXE) : $(OBJS)
 	$(COMPILER) -o $(EXE) $(OBJS) $(LIBS) $(OMP_FLAG)
 endif
+
+solverTypes.o: solverTypes/solverTypes.f90
+	$(COMPILER) -c $(FLAGS) solverTypes/solverTypes.f90
 
 kinds.o: kinds/kinds.f90
 	$(COMPILER) -c $(FLAGS) kinds/kinds.f90
@@ -104,7 +106,7 @@ vfield.o: field.o fields/vfield/vfield.f90
 momentumEqn.o: time.o momentumEqn/momentumEqn.f90
 	$(COMPILER) -D$(POIS_OPT) -c -cpp $(FLAGS) momentumEqn/momentumEqn.f90 $(OMP_FLAG)
 
-time.o: auxiliaryRoutines.o time/time.f90
+time.o: solverTypes.o auxiliaryRoutines.o initialConditions.o time/time.f90
 	$(COMPILER) -c $(FLAGS) time/time.f90
 
 ifeq ($(POIS_OPT),MG_MODE)
