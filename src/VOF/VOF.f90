@@ -1926,8 +1926,6 @@ contains
 						call interCentroids(vofb,i,j,k,pos_block,isBlockValid)
 						call parabFittedCurvature(vofb,i,j,k,pos_block,isBlockValid,.FALSE.,failed)						
 					end if
-							
-					!	call fdCurvature(vofb,i,j,k)	
 						
 					end if
 	
