@@ -184,7 +184,7 @@ contains
         
         !compute cfl max
         this%cflMax_ = computeCFLmax(this%ptrU_,this%dt_)
-        dt_cfl=this%dt_*this%cflLim_/this%cflMax_
+        dt_cfl=this%dt_*this%cflLim_/(this%cflMax_+tiny(0.d0))
         
         if (this%dt_>dt_cfl) then
         	if ((this%iter_>1) .AND. (this%adaptiveTimeStep_)) then
