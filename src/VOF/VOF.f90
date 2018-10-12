@@ -117,11 +117,11 @@ module vofMOD
 contains
 
 !========================================================================================!
-    subroutine vofCTOR(this,gmesh,mesh,rt,flow_solver,tpf)
+    subroutine vofCTOR(this,gmesh,mesh,rt,flow_solver)
         type(VOF), intent(out) :: this
         type(time), intent(in), target :: rt
         type(grid), intent(in), target :: gmesh, mesh
-        integer, intent(in) :: flow_solver,tpf
+        integer, intent(in) :: flow_solver
         integer :: nprocs
         type(parFile) :: pfile
         integer :: nx,ny,nz
@@ -144,7 +144,7 @@ contains
 		call readParameter(pfile,this%mug_,'mug')
 		call readParameter(pfile,this%sigma_,'sigma')
 		
-		if (flow_solver==tpf) then
+		if (flow_solver==TWO_PHASE_FLOW) then
 		
 			!init boxes
 			call vofBlocksCTOR(mesh,gmesh,rt)
