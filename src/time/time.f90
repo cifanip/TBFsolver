@@ -18,7 +18,9 @@
 
 module timeMod
 
+	use solverTypesMod
 	use auxiliaryRoutinesMod
+	use initialConditionsMod, only: pi
 	
 	implicit none
 	
@@ -39,6 +41,9 @@ module timeMod
 		logical, private :: adaptiveTimeStep_
 		real(DP), private :: cflLim_
 		real(DP), private :: cflMax_
+		
+		!time-step restr. (viscosity, surface tension)
+		logical, private :: setTimeStep_
 	
 		!timeControl parFile
 		type(parFile), private :: pfile_
@@ -149,6 +154,7 @@ contains
 		call readParameter(this%pfile_,this%writeInterval_,'writeInterval')
 		call readParameter(this%pfile_,this%dtout_,'dtout')
 		call readParameter(this%pfile_,this%adaptiveTimeStep_,'adaptiveTimeStep')
+		call readParameter(this%pfile_,this%setTimeStep_,'setTimeStep')
 		call readParameter(this%pfile_,this%cflLim_,'cflMax')
 		call readParameter(this%pfile_,this%dtVOFB_,'vofBlocksRedInterval')
 		call readParameter(this%pfile_,this%restart_boxes_,'restart_boxes')
@@ -170,6 +176,7 @@ contains
 !========================================================================================!
     subroutine update(this)
         type(time), intent(inout) :: this
+        real(DP) :: dt_cfl
         
         this%iter_ = this%iter_ + 1
         this%writeIter_ = this%writeIter_ + 1
@@ -177,12 +184,53 @@ contains
         
         !compute cfl max
         this%cflMax_ = computeCFLmax(this%ptrU_,this%dt_)
+        dt_cfl=this%dt_*this%cflLim_/this%cflMax_
         
-        if ((this%iter_>1) .AND. (this%adaptiveTimeStep_)) then
-        	this%dt_ = this%dt_*this%cflLim_/this%cflMax_
-        	!this%cflMax_ = this%cflLim_
+        if (this%dt_>dt_cfl) then
+        	if ((this%iter_>1) .AND. (this%adaptiveTimeStep_)) then
+        		this%dt_ = dt_cfl
+        	end if
         end if
 		
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
+    subroutine compute_timestep_restrictions(this,gmesh,rhol,rhog,mul,mug,sigma,solver)
+    	type(time), intent(inout) :: this
+    	type(grid), intent(in) :: gmesh
+    	real(DP), intent(in) :: rhol,rhog,mul,mug,sigma
+    	real(DP) :: dxm,dym,dzm,d,dt_nul,dt_nug,dt_sigma,dt_lim,sf
+    	integer, intent(in) :: solver
+    	integer :: nx,ny,nz
+    	
+    	nx=gmesh%nx_
+    	ny=gmesh%ny_
+    	nz=gmesh%nz_
+    	
+    	dxm=minval(gmesh%dxf_(0:nx+1))
+    	dym=minval(gmesh%dyf_(0:ny+1))
+    	dzm=minval(gmesh%dzf_(0:nz+1))
+    	d=minval((/dxm,dym,dzm/))
+    	
+    	dt_nul=rhol*(1.d0/6.d0)*d*d/mul
+    	dt_nug=rhog*(1.d0/6.d0)*d*d/mug
+    	if (solver==TWO_PHASE_FLOW) then
+    		dt_sigma=sqrt(d*d*d*(rhol+rhog)/(4.d0*pi*sigma))
+    	else
+    		dt_sigma=huge(0.d0)
+    	end if
+    	
+    	dt_lim=minval((/dt_nul,dt_nug,dt_sigma/))
+		
+		!safety factor
+		sf=3.d0
+		dt_lim=dt_lim/sf
+		
+		if (this%setTimeStep_) then
+			this%dt_=dt_lim
+		end if
+    	
     end subroutine
 !========================================================================================!
 
