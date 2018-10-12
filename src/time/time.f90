@@ -89,6 +89,7 @@ module timeMod
 	public :: gammaRKS
 	public :: xiRKS
 	public :: vofBlocksRed
+	public :: compute_timestep_restrictions
 
 	
 contains
@@ -196,11 +197,12 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-    subroutine compute_timestep_restrictions(this,gmesh,rhol,rhog,mul,mug,sigma,solver)
+    subroutine compute_timestep_restrictions(this,u,gmesh,rhol,rhog,mul,mug,sigma,solver)
     	type(time), intent(inout) :: this
+    	type(vfield), intent(in) :: u
     	type(grid), intent(in) :: gmesh
     	real(DP), intent(in) :: rhol,rhog,mul,mug,sigma
-    	real(DP) :: dxm,dym,dzm,d,dt_nul,dt_nug,dt_sigma,dt_lim,sf
+    	real(DP) :: dxm,dym,dzm,d,dt_cfl,dt_nul,dt_nug,dt_sigma,dt_lim,sf
     	integer, intent(in) :: solver
     	integer :: nx,ny,nz
     	
@@ -220,11 +222,11 @@ contains
     	else
     		dt_sigma=huge(0.d0)
     	end if
-    	
-    	dt_lim=minval((/dt_nul,dt_nug,dt_sigma/))
-		
+    	dt_cfl=compute_dt_CFL(u,this%cflLim_)
+    	dt_lim=minval((/dt_cfl,dt_nul,dt_nug,dt_sigma/))
+
 		!safety factor
-		sf=3.d0
+		sf=2.d0
 		dt_lim=dt_lim/sf
 		
 		if (this%setTimeStep_) then
