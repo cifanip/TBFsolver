@@ -25,11 +25,7 @@ PROGRAM main
 	USE statisticsMod
 	USE rampUpPropMod
 	
-	
 	IMPLICIT NONE
-	
-	integer, parameter :: SINGLE_PHASE_FLOW = 1
-	integer, parameter :: TWO_PHASE_FLOW  = 2
 	
 	integer :: ierror,flow_solver
 	type(mpiControl) :: mpiCTRL
@@ -131,7 +127,7 @@ contains
 		call parFileCTOR(file_fsolver,'flowSolver','specs')
 		call readParameter(file_fsolver,flow_solver,'flow_solver')
 	
-		call vofCTOR(vofS,gmesh,mesh,runTime,flow_solver,TWO_PHASE_FLOW)
+		call vofCTOR(vofS,gmesh,mesh,runTime,flow_solver)
 		call momentumEqnCTOR(uEqn,gMesh,mesh,u,runTime)
 #ifdef FAST_MODE
 		call poissonEqnCTOR(pEqn,mesh,gMesh,psi,runTime,vofS%rhol_,vofS%rhog_)
@@ -146,6 +142,10 @@ contains
 		call updateMaterialProps(vofS,c,cs,rho,mu)
 
 		call statisticsCTOR(stats,u,w,p,c,mu,vofS%mul_/vofS%rhol_,gMesh)
+		
+		!store time-step restrictions
+		call compute_timestep_restrictions(runTime,gMesh,vofS%rhol_,vofS%rhog_,&
+									       vofS%mul_,vofS%mug_,vofS%sigma_,flow_solver)
 	
 	end subroutine
 !========================================================================================!
