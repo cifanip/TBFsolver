@@ -144,7 +144,7 @@ contains
 		call statisticsCTOR(stats,u,w,p,c,mu,vofS%mul_/vofS%rhol_,gMesh)
 		
 		!store time-step restrictions
-		call compute_timestep_restrictions(runTime,gMesh,vofS%rhol_,vofS%rhog_,&
+		call compute_timestep_restrictions(runTime,u,gMesh,vofS%rhol_,vofS%rhog_,&
 									       vofS%mul_,vofS%mug_,vofS%sigma_,flow_solver)
 	
 	end subroutine
