@@ -24,6 +24,8 @@ module auxiliaryRoutinesMod
 
 	public :: computeContinuityError
 	public :: computeCFLmax
+	public :: compute_dt_CFL
+	public :: compute_Umag_max
 	public :: updateShearFlow
 	public :: shapeError
 	public :: setPressGrad
@@ -133,6 +135,52 @@ contains
         cfl = cfl*dt
         
         call Mpi_Allreduce(cfl, cflg, 1, MPI_DOUBLE_PRECISION, MPI_MAX, mpic%cartComm_, ierror)
+
+        
+    end function
+!========================================================================================!
+
+!========================================================================================!
+    function compute_dt_CFL(u,cfl) result(dt_g)
+		type(vfield), intent(in) :: u
+		real(DP), intent(in) :: cfl
+		type(grid), pointer :: mesh
+		type(mpiControl), pointer :: mpic
+		real(DP) :: cx,cy,cz,dt,dt_g
+		integer :: i,j,k,nx,ny,nz
+		integer :: ierror
+        
+        mesh => u%ptrMesh_
+        mpic => mesh%ptrMPIC_
+        
+        dt = huge(0.d0)
+        
+        nx = mesh%nx_
+        ny = mesh%ny_
+        nz = mesh%nz_       
+        
+		!$OMP PARALLEL DO DEFAULT(none) &
+		!$OMP SHARED(u,mesh,cfl) &
+		!$OMP SHARED(nx,ny,nz) &
+		!$OMP PRIVATE(cx,cy,cz) &
+		!$OMP PRIVATE(i,j,k) &
+		!$OMP REDUCTION(min:dt)
+        do k = 1,nz
+        	do j = 1,ny
+        		do i = 1,nx
+        		
+        			cx = abs(0.5d0*(u%ux_%f_(i,j,k)+u%ux_%f_(i-1,j,k)))/mesh%dxf_(i)
+        			cy = abs(0.5d0*(u%uy_%f_(i,j,k)+u%uy_%f_(i,j-1,k)))/mesh%dyf_(j)
+        			cz = abs(0.5d0*(u%uz_%f_(i,j,k)+u%uz_%f_(i,j,k-1)))/mesh%dzf_(k)
+        			
+        			dt = min(cfl/(cx+cy+cz),dt)
+        			
+        		end do
+        	end do
+        end do   
+        !$OMP END PARALLEL DO
+        
+        call Mpi_Allreduce(dt, dt_g, 1, MPI_DOUBLE_PRECISION, MPI_MIN, mpic%cartComm_, ierror)
 
         
     end function
