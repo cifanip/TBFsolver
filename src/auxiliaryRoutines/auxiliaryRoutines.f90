@@ -139,6 +139,53 @@ contains
 !========================================================================================!
 
 !========================================================================================!
+    subroutine compute_Umag_max(u)
+		type(vfield), intent(in) :: u
+		type(grid), pointer :: mesh
+		type(mpiControl), pointer :: mpic
+		real(DP) :: ux, uy, uz, um, umax, umax_g
+		integer :: i, j, k, nx, ny, nz
+		integer :: ierror
+        
+        mesh => u%ptrMesh_
+        mpic => mesh%ptrMPIC_
+        
+        um = -1.d0
+        
+        nx = mesh%nx_
+        ny = mesh%ny_
+        nz = mesh%nz_       
+        
+		!$OMP PARALLEL DO DEFAULT(none) &
+		!$OMP SHARED(u,mesh) &
+		!$OMP SHARED(nx,ny,nz) &
+		!$OMP PRIVATE(ux,uy,uz,um) &
+		!$OMP PRIVATE(i,j,k) &
+		!$OMP REDUCTION(max:umax)
+        do k = 1,nz
+        	do j = 1,ny
+        		do i = 1,nx  		
+        			ux = 0.5d0*(u%ux_%f_(i,j,k)+u%ux_%f_(i-1,j,k))
+        			uy = 0.5d0*(u%uy_%f_(i,j,k)+u%uy_%f_(i,j-1,k))
+        			uz = 0.5d0*(u%uz_%f_(i,j,k)+u%uz_%f_(i,j,k-1))
+        			um=sqrt(ux*ux+uy*uy+uz*uz)
+        			umax = max(umax,um)
+        		end do
+        	end do
+        end do   
+        !$OMP END PARALLEL DO
+        
+        call Mpi_reduce(umax,umax_g,1,MPI_DOUBLE_PRECISION,MPI_MAX,0,mpic%cartComm_,ierror)
+        
+        if (IS_MASTER) then
+        	write(*,'(A,'//s_outputFormat(2:9)//')') '	Umax: ', umax_g
+        end if
+
+        
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
     subroutine updateShearFlow(u,u0,t,dt)
 		type(vfield), intent(inout) :: u
 		type(vfield), intent(in) :: u0
