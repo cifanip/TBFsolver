@@ -44,6 +44,7 @@ module timeMod
 		
 		!time-step restr. (viscosity, surface tension)
 		logical, private :: setTimeStep_
+		real(DP), private :: dtLim_
 	
 		!timeControl parFile
 		type(parFile), private :: pfile_
@@ -185,10 +186,10 @@ contains
         
         !compute cfl max
         this%cflMax_ = computeCFLmax(this%ptrU_,this%dt_)
-        dt_cfl=this%dt_*this%cflLim_/(this%cflMax_+tiny(0.d0))
         
-        if (this%dt_>dt_cfl) then
-        	if ((this%iter_>1) .AND. (this%adaptiveTimeStep_)) then
+        if (this%adaptiveTimeStep_) then
+        	dt_cfl=this%dt_*this%cflLim_/(this%cflMax_+tiny(0.d0))
+        	if ((this%dt_>dt_cfl).AND.(this%iter_>1)) then
         		this%dt_ = dt_cfl
         	end if
         end if
@@ -202,7 +203,7 @@ contains
     	type(vfield), intent(in) :: u
     	type(grid), intent(in) :: gmesh
     	real(DP), intent(in) :: rhol,rhog,mul,mug,sigma
-    	real(DP) :: dxm,dym,dzm,d,dt_cfl,dt_nul,dt_nug,dt_sigma,dt_lim,sf
+    	real(DP) :: dxm,dym,dzm,d,dt_cfl,dt_nul,dt_nug,dt_sigma,dt_lim
     	integer, intent(in) :: solver
     	integer :: nx,ny,nz
     	
@@ -222,15 +223,20 @@ contains
     	else
     		dt_sigma=huge(0.d0)
     	end if
-    	dt_cfl=compute_dt_CFL(u,this%cflLim_)
-    	dt_lim=minval((/dt_cfl,dt_nul,dt_nug,dt_sigma/))
 
-		!safety factor
-		sf=2.d0
-		dt_lim=dt_lim/sf
+    	dt_cfl=compute_dt_CFL(u,this%cflLim_)
+    	
+    	dt_nul=dt_nul/2.d0
+    	dt_nug=dt_nug/2.d0
+    	dt_sigma=dt_sigma/3.d0
+    	dt_cfl=dt_cfl/1.5d0
+    	
+    	dt_lim=minval((/dt_cfl,dt_nul,dt_nug,dt_sigma/))
+    	
+    	this%dtLim_=dt_lim
 		
 		if (this%setTimeStep_) then
-			this%dt_=dt_lim
+			this%dt_=this%dtLim_
 		end if
     	
     end subroutine
