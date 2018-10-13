@@ -187,11 +187,9 @@ contains
         !compute cfl max
         this%cflMax_ = computeCFLmax(this%ptrU_,this%dt_)
         
-        if (this%adaptiveTimeStep_) then
+        if ((this%adaptiveTimeStep_).AND.(this%iter_>1)) then
         	dt_cfl=this%dt_*this%cflLim_/(this%cflMax_+tiny(0.d0))
-        	if ((this%dt_>dt_cfl).AND.(this%iter_>1)) then
-        		this%dt_ = dt_cfl
-        	end if
+        	this%dt_ = min(dt_cfl,this%dtLim_)
         end if
 		
     end subroutine
@@ -229,14 +227,12 @@ contains
     	dt_nul=dt_nul/2.d0
     	dt_nug=dt_nug/2.d0
     	dt_sigma=dt_sigma/3.d0
-    	dt_cfl=dt_cfl/1.5d0
     	
-    	dt_lim=minval((/dt_cfl,dt_nul,dt_nug,dt_sigma/))
-    	
+    	dt_lim=minval((/dt_nul,dt_nug,dt_sigma/))
     	this%dtLim_=dt_lim
 		
 		if (this%setTimeStep_) then
-			this%dt_=this%dtLim_
+			this%dt_=min(this%dtLim_,dt_cfl)
 		end if
     	
     end subroutine
