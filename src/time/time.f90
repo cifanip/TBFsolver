@@ -226,7 +226,7 @@ contains
     	
     	dt_nul=dt_nul/2.d0
     	dt_nug=dt_nug/2.d0
-    	dt_sigma=dt_sigma/3.d0
+    	dt_sigma=dt_sigma/2.5d0
     	
     	dt_lim=minval((/dt_nul,dt_nug,dt_sigma/))
     	this%dtLim_=dt_lim
