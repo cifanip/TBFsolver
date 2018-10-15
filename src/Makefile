@@ -2,7 +2,8 @@
 EXE = TBFsolver
 POIS_OPT = FAST_MODE
 MEM_OPT = MEM_SAVE
-COMPILER = mpifort
+#select the compiler
+COMPILER = 
 
 #if POIS_OPT=MG_MODE add paths to MUMPS lib
 MUMPS_INCL = 
@@ -22,16 +23,19 @@ LIBS = $(FFTW_FLAGS) $(LAPACK_FLAGS)
 LIB_DIRS = 
 endif
 
-OMP_FLAG = -fopenmp
+#modify the flags according to the chosen compiler
+OMP_FLAG = -qopenmp
+
+STACK_OPT = -heap-arrays
 
 #debug
-#FLAGS = -g -fcheck=all -fbacktrace
+#FLAGS = -g -check all -traceback -fpe0
 
 #optimal 
-FLAGS = -O2 -fbacktrace
+FLAGS = -O2 -traceback
 
 ifeq ($(POIS_OPT),MG_MODE)
-OBJS = solverTypes.o kinds.o formats.o interpolation.o initMpiGvar.o ompRoutines.o errorHandler.o allocateArrays.o 
+OBJS = solverTypes.o kinds.o formats.o interpolation.o initMpiGvar.o ompRoutines.o errorHandler.o allocateArrays.o \
 mpiControl.o grid.o parFile.o field.o rbgs.o poissMat.o multiGrid.o vfield.o momentumEqn.o vofBlocks.o \
 poissonEqn.o time.o auxiliaryRoutines.o initialConditions.o VOF.o statistics.o pcg.o rampUpProp.o main.o
 else ifeq ($(POIS_OPT),FAST_MODE)
@@ -125,7 +129,7 @@ initialConditions.o: vfield.o initialConditions/initialConditions.f90
 	$(COMPILER) -c $(FLAGS) initialConditions/initialConditions.f90 $(OMP_FLAG)
 
 vofBlocks.o: initialConditions.o VOF/vofBlocks.f90
-	$(COMPILER) -c $(FLAGS) VOF/vofBlocks.f90 $(OMP_FLAG)
+	$(COMPILER) -c $(FLAGS) $(STACK_OPT) VOF/vofBlocks.f90 $(OMP_FLAG)
 
 VOF.o: vofBlocks.o time.o VOF/VOF.f90
 	$(COMPILER) -c $(FLAGS) VOF/VOF.f90 $(OMP_FLAG)
