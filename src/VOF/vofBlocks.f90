@@ -1224,9 +1224,9 @@ contains
 					
 					if (random_distr) then
 						call RANDOM_NUMBER(rnd)
-						x0 = x0 + (rnd(1)-0.5d0)*0.85d0*sx
-						y0 = y0 + (rnd(2)-0.5d0)*0.85d0*sy
-						z0 = z0 + (rnd(3)-0.5d0)*0.85d0*sz
+						x0 = x0 + (rnd(1)-0.5d0)*0.3d0*sx
+						y0 = y0 + (rnd(2)-0.5d0)*0.3d0*sy
+						z0 = z0 + (rnd(3)-0.5d0)*0.3d0*sz
 					end if
 								
 					call init_indexes_box(mesh,bi,x0,y0,z0,R)
