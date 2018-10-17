@@ -182,7 +182,6 @@ contains
         
         this%iter_ = this%iter_ + 1
         this%writeIter_ = this%writeIter_ + 1
-        this%t_ = this%t_ + this%dt_
         
         !compute cfl max
         this%cflMax_ = computeCFLmax(this%ptrU_,this%dt_)
@@ -191,6 +190,8 @@ contains
         	dt_cfl=this%dt_*this%cflLim_/(this%cflMax_+tiny(0.d0))
         	this%dt_ = min(dt_cfl,this%dtLim_)
         end if
+	
+	this%t_ = this%t_ + this%dt_
 		
     end subroutine
 !========================================================================================!
