@@ -230,10 +230,12 @@ contains
     	dt_sigma=dt_sigma/2.5d0
     	
     	dt_lim=minval((/dt_nul,dt_nug,dt_sigma/))
-    	this%dtLim_=dt_lim
 		
 		if (this%setTimeStep_) then
+			this%dtLim_=dt_lim
 			this%dt_=min(this%dtLim_,dt_cfl)
+		else
+			this%dtLim_=this%dt_
 		end if
     	
     end subroutine
