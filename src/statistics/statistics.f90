@@ -18,7 +18,7 @@
 
 module statisticsMod
 
-	use vfieldMod
+	use timeMod
 	
 	implicit none
 	
@@ -102,12 +102,13 @@ contains
 
 
 !========================================================================================!
-	subroutine statisticsCTOR(this,u,w,p,c,mu,nu,gmesh)
+	subroutine statisticsCTOR(this,u,w,p,c,mu,nu,gmesh,rt)
 		type(statistics), intent(out) :: this
 		type(vfield), target, intent(in) :: u,w
 		type(field), target, intent(in) :: p,c,mu
 		real(DP), intent(in) :: nu
 		type(grid), target, intent(in) :: gmesh
+		type(time), intent(in) :: rt
 		type(parFile) :: pfile
 		integer :: nyg
 		
@@ -198,6 +199,11 @@ contains
 			
 			tauw_tav = 0.d0
 			
+		end if
+		
+		!read stats if necessary
+		if (rt%t_>this%Ts_) then
+			call readStats(this,rt%inputFold_)
 		end if
 		
 		!allocate space average volume
@@ -547,7 +553,7 @@ contains
 		integer :: j,nyg
 		
 		nyg = this%p_%ptrMesh_%nyg_
-
+		
 		do j=1,nyg							
 			cm_(1,j) = ( cm_(1,j)*(t-this%Ts_)+scm(1,j)*dt ) / (t-this%Ts_+dt)
 		end do
@@ -749,6 +755,33 @@ contains
 		call writeStats_region(this,nf,pmg_,ppmg_,umg_,uumg_,wmg_,wwmg_,dumg_,dudumg_,s_gas_region)
 		call writeStats_region(this,nf,pml_,ppml_,uml_,uuml_,wml_,wwml_,duml_,duduml_,s_liquid_region)
 		
+		call writeStats_tauw(this,nf,tauw_tav)
+		
+	end subroutine
+!========================================================================================!
+
+!========================================================================================!
+	subroutine writeStats_tauw(this,nf,tauw)
+		type(statistics), intent(in) :: this
+		integer, intent(in) :: nf
+		real(DP), intent(in) :: tauw
+		character(len=20) :: dirName
+		integer :: ny
+		
+		ny = this%p_%ptrMesh_%nyg_
+		
+		if (IS_MASTER) then
+        
+        	write(dirName,s_intFormat) nf
+        	
+			!volume fraction
+			open(UNIT=s_IOunitNumber,FILE=adjustl(trim(dirName)//'/tauw'),&
+				 STATUS='REPLACE',ACTION='WRITE')
+				write(s_IOunitNumber,'(1'//s_doubleFormat(2:10)//')') tauw
+			close(s_IOunitNumber)	
+
+		end if
+		
 	end subroutine
 !========================================================================================!
 
@@ -756,7 +789,7 @@ contains
 	subroutine writeStats_VF(this,nf,cm)
 		type(statistics), intent(in) :: this
 		integer, intent(in) :: nf
-		real(DP), allocatable, dimension(:,:) ::cm
+		real(DP), allocatable, dimension(:,:), intent(in) ::cm
 		integer :: j, ny
 		character(len=20) :: dirName
 		
@@ -784,7 +817,7 @@ contains
 	subroutine writeStats_region(this,nf,pm,ppm,um,uum,wm,wwm,dum,dudum,region)
 		type(statistics), intent(in) :: this
 		integer, intent(in) :: nf, region
-		real(DP), allocatable, dimension(:,:) :: pm,ppm,um,uum,wm,wwm,dum,dudum
+		real(DP), allocatable, dimension(:,:), intent(in) :: pm,ppm,um,uum,wm,wwm,dum,dudum
 		integer :: j, ny
 		character(len=20) :: dirName
 		character(len=2) :: char_reg
@@ -852,6 +885,149 @@ contains
 		
 		end if
 		
+		
+	end subroutine
+!========================================================================================!
+
+!========================================================================================!
+	subroutine readStats(this,nf)
+		type(statistics), intent(in) :: this
+		integer, intent(in) :: nf
+		
+		call readStats_VF(this,nf,cm_)
+		
+		call readStats_region(this,nf,pm_,ppm_,um_,uum_,wm_,wwm_,dum_,dudum_,s_whole_region)
+		call readStats_region(this,nf,pmg_,ppmg_,umg_,uumg_,wmg_,wwmg_,dumg_,dudumg_,s_gas_region)
+		call readStats_region(this,nf,pml_,ppml_,uml_,uuml_,wml_,wwml_,duml_,duduml_,s_liquid_region)
+		
+		call readStats_tauw(this,nf,tauw_tav)
+		
+	end subroutine
+!========================================================================================!
+
+!========================================================================================!
+	subroutine readStats_tauw(this,nf,tauw)
+		type(statistics), intent(in) :: this
+		integer, intent(in) :: nf
+		real(DP), intent(out) :: tauw
+		character(len=20) :: dirName
+		integer :: ny
+		
+		ny = this%p_%ptrMesh_%nyg_
+		
+		if (IS_MASTER) then
+        
+        	write(dirName,s_intFormat) nf
+        	
+			!volume fraction
+			open(UNIT=s_IOunitNumber,FILE=adjustl(trim(dirName)//'/tauw'),&
+				 STATUS='OLD',ACTION='READ')
+				read(s_IOunitNumber,'(1'//s_doubleFormat(2:10)//')') tauw
+			close(s_IOunitNumber)	
+
+		end if
+		
+	end subroutine
+!========================================================================================!
+
+!========================================================================================!
+	subroutine readStats_VF(this,nf,cm)
+		type(statistics), intent(in) :: this
+		integer, intent(in) :: nf
+		real(DP), allocatable, dimension(:,:), intent(inout) ::cm
+		integer :: j, ny
+		character(len=20) :: dirName
+		
+		ny = this%p_%ptrMesh_%nyg_
+		
+		if (IS_MASTER) then
+        
+        	write(dirName,s_intFormat) nf
+        	
+			!volume fraction
+			open(UNIT=s_IOunitNumber,FILE=adjustl(trim(dirName)//'/stats_c'),&
+				 STATUS='OLD',ACTION='READ')
+			do j=1,ny
+				read(s_IOunitNumber,'(1'//s_doubleFormat(2:10)//')') cm(1,j)
+			end do
+			close(s_IOunitNumber)
+		
+		end if
+
+	end subroutine
+!========================================================================================!
+
+!========================================================================================!
+	subroutine readStats_region(this,nf,pm,ppm,um,uum,wm,wwm,dum,dudum,region)
+		type(statistics), intent(in) :: this
+		integer, intent(in) :: nf, region
+		real(DP), allocatable, dimension(:,:), intent(inout) :: pm,ppm,um,uum,wm,wwm,dum,dudum
+		integer :: j, ny
+		character(len=20) :: dirName
+		character(len=2) :: char_reg
+
+		ny = this%p_%ptrMesh_%nyg_
+		
+		if (IS_MASTER) then
+        
+        	write(dirName,s_intFormat) nf
+        	
+        	select case(region)
+        		case(s_whole_region)
+        			char_reg = '_W'
+        		case(s_gas_region)
+        			char_reg = '_G'
+        		case(s_liquid_region)
+        			char_reg = '_L'
+        		case default
+        	end select
+		
+			!pressure
+			open(UNIT=s_IOunitNumber,FILE=adjustl(trim(dirName)//'/stats_p'//char_reg),&
+				 STATUS='OLD',ACTION='READ')
+			do j=1,ny
+				read(s_IOunitNumber,'(2'//s_doubleFormat(2:10)//')') pm(1,j),ppm(1,j)
+			end do
+			close(s_IOunitNumber)
+			
+			!velocity
+			open(UNIT=s_IOunitNumber,FILE=adjustl(trim(dirName)//'/stats_u'//char_reg),&
+				 STATUS='OLD',ACTION='READ')
+			do j=1,ny	
+				read(s_IOunitNumber,'(9'//s_doubleFormat(2:10)//')') &
+					  um(1,j),um(2,j),um(3,j),	  &
+					  uum(1,j),uum(2,j),uum(3,j),  &
+					  uum(4,j),uum(5,j),uum(6,j)
+			end do
+			close(s_IOunitNumber)
+			
+			!vorticity
+			open(UNIT=s_IOunitNumber,FILE=adjustl(trim(dirName)//'/stats_w'//char_reg),&
+				 STATUS='OLD',ACTION='READ')
+			do j=1,ny	
+				read(s_IOunitNumber,'(9'//s_doubleFormat(2:10)//')') &
+					  wm(1,j),wm(2,j),wm(3,j),	  &
+					  wwm(1,j),wwm(2,j),wwm(3,j),  &
+					  wwm(4,j),wwm(5,j),wwm(6,j)
+			end do
+			close(s_IOunitNumber)
+			
+			!gradU
+			open(UNIT=s_IOunitNumber,FILE=adjustl(trim(dirName)//'/stats_gradU'//char_reg),&
+				 STATUS='OLD',ACTION='READ')
+			do j=1,ny	
+				read(s_IOunitNumber,'(21'//s_doubleFormat(2:10)//')') &
+					  dum(1,j),dum(2,j),dum(3,j),  		&
+					  dum(4,j),dum(5,j),dum(6,j),  		&
+					  dum(7,j),dum(8,j),dum(9,j),  		&
+					  dudum(1,j),dudum(2,j),dudum(3,j),  &
+					  dudum(4,j),dudum(5,j),dudum(6,j),  &
+					  dudum(7,j),dudum(8,j),dudum(9,j),	&
+					  dudum(10,j),dudum(11,j),dudum(12,j)
+			end do
+			close(s_IOunitNumber)			
+		
+		end if
 		
 	end subroutine
 !========================================================================================!
@@ -987,7 +1163,7 @@ contains
 			tau_g=tau_g/(Lx*Lz)
 			write(*,'(A,'//s_doubleFormat(2:10)//')') '	(tau_w)_A:  ', tau_g		
 		
-			if (this%isTimeAverage_) then
+			if (this%isTimeAverage_) then	
 				tauw_tav = ( tauw_tav*(t-this%Ts_)+tau_g*dt ) / (t-this%Ts_+dt)
 				write(*,'(A,'//s_doubleFormat(2:10)//')') '	(tau_w)_A,t:', tauw_tav
 			end if
@@ -1001,16 +1177,14 @@ contains
     subroutine checkTimeAverage(this,t)
     	type(statistics), intent(inout) :: this
     	real(DP), intent(in) :: t
-
     	
     	if (t >= this%Ts_) then    	
     		this%isTimeAverage_ = .TRUE.
-    		this%Ts_=t
     		this%hasTimeAvStarted_=.TRUE.
 		else		
 			this%isTimeAverage_ = .FALSE.			
 		end if
-    	
+
     end subroutine
 !========================================================================================!
 
@@ -1021,8 +1195,7 @@ contains
 		if (IS_MASTER) then
 			write(*,'(A,'//s_outputFormat(2:9)//')') '	Statistics: CPU time = ', cpuTime
 		end if
-		
-    	
+			
     end subroutine
 !========================================================================================!
 
