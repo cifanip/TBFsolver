@@ -216,7 +216,7 @@ contains
         							    idx(3)-offset_c,idx(4)+offset_c,&
         							    idx(5)-offset_c,idx(6)+offset_c)
         		read(s_IOunitNumber) c
-        		read(s_IOunitNumber) c0
+        		c0=c
         		
         		call addNewBlock(vofBlocks,nb_tmp)
         		call initBlock(mesh,gmesh,vofBlocks(nb_tmp),bn,master,idx(1),idx(2),&
@@ -2697,7 +2697,6 @@ contains
         		write(s_IOunitNumber) vofBlocks(i)%master
         		write(s_IOunitNumber) vofBlocks(i)%bn
         		write(s_IOunitNumber) vofBlocks(i)%idx
-        		write(s_IOunitNumber) vofBlocks(i)%c
         		write(s_IOunitNumber) vofBlocks(i)%c0
 			
 			close(s_IOunitNumber)	
