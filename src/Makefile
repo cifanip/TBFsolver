@@ -134,7 +134,7 @@ vofBlocks.o: initialConditions.o VOF/vofBlocks.f90
 VOF.o: vofBlocks.o time.o VOF/VOF.f90
 	$(COMPILER) -c $(FLAGS) VOF/VOF.f90 $(OMP_FLAG)
 
-statistics.o: vfield.o statistics/statistics.f90
+statistics.o: time.o statistics/statistics.f90
 	$(COMPILER) -c $(FLAGS) statistics/statistics.f90 $(OMP_FLAG)	
 
 pcg.o: multiGrid.o pcg/pcg.f90
