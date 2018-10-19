@@ -141,7 +141,7 @@ contains
 		call rampUpPropCTOR(muRamp,vofS%mug_,vofS%mul_,vofS%mug_)
 		call updateMaterialProps(vofS,c,cs,rho,mu)
 
-		call statisticsCTOR(stats,u,w,p,c,mu,vofS%mul_/vofS%rhol_,gMesh)
+		call statisticsCTOR(stats,u,w,p,c,mu,vofS%mul_/vofS%rhol_,gMesh,runTime)
 		
 		!store time-step restrictions
 		call compute_timestep_restrictions(runTime,u,gMesh,vofS%rhol_,vofS%rhog_,&
