@@ -92,7 +92,6 @@ module vofBlocksMod
 	
 	
 	public :: vofBlocksCTOR
-	public :: initVOFblocks
 	public :: grid_2_boxes_u
 	public :: boxes_2_grid_f
 	public :: boxes_2_grid_vf
@@ -103,6 +102,10 @@ module vofBlocksMod
 	public :: reInitBlockDistribution
 	public :: deallocateBlocks
 	
+	private :: build_VOF_blocks
+	private :: initVOFblocks
+	private :: measureBlocksDistr
+	private :: readVOFblocks
 	private :: initBlock
 	private :: allocate_blk_arrays
 	private :: addNewBlock
@@ -174,6 +177,36 @@ contains
 !========================================================================================!
 
 !========================================================================================!
+    subroutine measureBlocksDistr(mpic)
+    	type(mpiControl), intent(in) :: mpic
+    	integer :: n_max,n_min,nproc,ierror
+    	real(DP) :: av_sq,av_sq_dev,q
+
+		call Mpi_Reduce(s_nblk, n_max, 1, MPI_INTEGER, MPI_MAX, 0, &
+					    mpic%cartComm_, ierror)
+		call Mpi_Reduce(s_nblk, n_min, 1, MPI_INTEGER, MPI_MIN, 0, &
+					    mpic%cartComm_, ierror)
+	
+		nproc=mpic%nProcs_
+		q=s_nblk*s_nblk
+
+		call Mpi_Reduce(q, av_sq, 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
+					    mpic%cartComm_, ierror)		
+		
+		if (IS_MASTER) then
+			av_sq=sqrt(av_sq/nproc)
+			av_sq_dev=av_sq/(s_nb/nproc)
+		end if  
+		
+		if (IS_MASTER) then	
+			write(*,'(A,I5,A,I5,A,ES11.4E2)') '	Block distr.: MAX = ',n_max, &
+										      ' MIN = ',n_min, ' AV_DEV = ',av_sq_dev
+		end if	 
+		
+    end subroutine   	
+!========================================================================================!
+
+!========================================================================================!
     subroutine readVOFblocks(mesh,gmesh,rt)
     	type(grid), intent(in) :: mesh,gmesh
     	type(time), intent(in) :: rt
@@ -182,9 +215,13 @@ contains
     	integer, dimension(6) :: idx
     	character(len=10) :: dirName,bname
     	real(DP) :: dummy
-    	integer :: ierror,nb_rmp,i,master,bn,nb_tmp,n_blk_max
+    	integer :: ierror,nb_rmp,i,master,bn,nb_tmp
     	
     	mpic => mesh%ptrMPIC_
+    	
+		if (IS_MASTER) then
+			write(*,'(A)') 'READ VOF BLOCKS'
+		end if
     	
     	write(dirName,s_intFormat) rt%inputFold_
     	
@@ -233,14 +270,11 @@ contains
 			s_nblk=0
 		end if
 
-		!check max blocks per MPI_Proc
-		call Mpi_Reduce(s_nblk, n_blk_max, 1, MPI_INTEGER, MPI_MAX, 0, &
-					    mpic%cartComm_, ierror)
-		
 		if (IS_MASTER) then
-			write(*,'(A)') 'END INIT VOF BLOCKS'
-			write(*,*) 'Max number of blocks per MPI proc: ', n_blk_max
+			write(*,'(A)') 'END READ VOF BLOCKS'
 		end if
+		
+		call measureBlocksDistr(mpic)
     	
     end subroutine   	
 !========================================================================================!
@@ -252,7 +286,7 @@ contains
     	integer, parameter :: single_bubbles = 1, array_bubbles = 2, two_bubbles=3
     	logical, allocatable, dimension(:) :: b_proc_bool
     	type(parFile) :: pfile
-    	integer :: method,nref,ierror,bi,is,js,ks,ie,je,ke,nb_tmp,n_blk_max
+    	integer :: method,nref,ierror,bi,is,js,ks,ie,je,ke,nb_tmp
     	real(DP) :: x0,y0,z0,R
     	logical :: present
     	!dummies for initBlock routine
@@ -341,15 +375,13 @@ contains
 		do bi=1,s_nblk
 			vofBlocks(bi)%c0=vofBlocks(bi)%c
 		end do  
-		
-		!check max blocks per MPI_Proc
-		call Mpi_Reduce(s_nblk, n_blk_max, 1, MPI_INTEGER, MPI_MAX, 0, &
-					    mpiCTRL%cartComm_, ierror)
-		
+
 		if (IS_MASTER) then
 			write(*,'(A)') 'END INIT VOF BLOCKS'
-			write(*,*) 'Max number of blocks per MPI proc: ', n_blk_max
-		end if			
+		end if
+		
+		call measureBlocksDistr(mpiCTRL)
+	
     	
      end subroutine   	
 !========================================================================================!
@@ -2614,8 +2646,9 @@ contains
 		end if
 		s_exchange_g(mpic%rank_)=.FALSE.
 		s_exchange_b = .FALSE.
-
-
+		
+		call measureBlocksDistr(mpic)
+		
     end subroutine   	
 !========================================================================================!
 
