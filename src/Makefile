@@ -26,7 +26,8 @@ endif
 #modify the flags according to the chosen compiler
 OMP_FLAG = -qopenmp
 
-STACK_OPT = -heap-arrays
+STACK_OPT =
+#STACK_OPT = -heap-arrays
 
 #debug
 #FLAGS = -g -check all -traceback -fpe0
