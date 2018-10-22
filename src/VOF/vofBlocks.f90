@@ -180,7 +180,7 @@ contains
     subroutine measureBlocksDistr(mpic)
     	type(mpiControl), intent(in) :: mpic
     	integer :: n_max,n_min,nproc,ierror
-    	real(DP) :: av_sq,av_sq_dev,q
+    	real(DP) :: av_sq,av_sq_sc,q
 
 		call Mpi_Reduce(s_nblk, n_max, 1, MPI_INTEGER, MPI_MAX, 0, &
 					    mpic%cartComm_, ierror)
@@ -195,12 +195,12 @@ contains
 		
 		if (IS_MASTER) then
 			av_sq=sqrt(av_sq/nproc)
-			av_sq_dev=av_sq/(s_nb/nproc)
+			av_sq_sc=av_sq/(s_nb/nproc)
 		end if  
 		
 		if (IS_MASTER) then	
 			write(*,'(A,I5,A,I5,A,ES11.4E2)') '	Block distr.: MAX = ',n_max, &
-										      ' MIN = ',n_min, ' AV_DEV = ',av_sq_dev
+										      ' MIN = ',n_min, ' AVG = ',av_sq_sc
 		end if	 
 		
     end subroutine   	
