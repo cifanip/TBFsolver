@@ -38,7 +38,7 @@ module vofMOD
 		type(time), pointer :: ptrTime_ => NULL() 
 		
 		!threshold vof field
-		real(DP), private :: eps_ = 1.d-8
+		real(DP), private :: eps_ = 1.d-12
 		
 		!halo dim of box volume fraction field
 		integer, private :: hd_
@@ -427,7 +427,8 @@ contains
 		!search for interface full cells
 		call search_full_interface_cells(this,vofb)
     	
-		call computeNormal_youngs(this,vofb)
+    	call computeNormal_hf(this,vofb)
+		!call computeNormal_youngs(this,vofb)
 		
     	do k=lbk,ubk
     		do j=lbj,ubj
@@ -1360,18 +1361,20 @@ contains
     subroutine computeNormal_hf(this,vofb)
     	type(VOF), intent(in) :: this
         type(vofBlock), intent(inout) :: vofb
-        integer :: i, j, k,cn
+        integer :: i, j, k,cn,w
         integer :: lbi, ubi, lbj, ubj, lbk, ubk
         real(DP) :: mx, my, mz
         real(DP) :: mmax
-        integer :: mloc
+        integer, dimension(3) :: mloc
+        integer, dimension(4) :: seq,lb_seq
+        real(DP), dimension(4) :: h_seq
         real(DP), dimension(3) :: mv
         real(DP), dimension(9) :: h
         integer, dimension(9) :: lb
         logical, dimension(9) :: isValid
         integer, dimension(3,9) :: d
         real(DP), dimension(3,9) :: pos_hf
-        logical :: hfk
+        logical :: hfn
         
 		lbi = lbound(vofb%nx,1)
 		ubi = ubound(vofb%nx,1)
@@ -1381,13 +1384,14 @@ contains
 		ubk = ubound(vofb%nx,3)
 		
 		call computeNormal_youngs(this,vofb)
+		
+		!search columns sequence
+		seq=(/2,4,6,8/)
 
 		do k=lbk,ubk
 			do j=lbj,ubj
 				do i=lbi,ubi
 
-					hfk = .TRUE.
-				
 					if (vofb%isMixed(i,j,k)) then
 					
 						mx = vofb%nx(i,j,k)
@@ -1395,29 +1399,46 @@ contains
 						mz = vofb%nz(i,j,k)
 					
 						mv = (/ mx, my, mz /)
-						mloc = maxloc( abs(mv),1 )
-						mmax = mv(mloc)
-					
-						!chiama procedura colonna
-						call setStencilPar(mloc,d)
-						do cn=1,9
-							call hfColumn(vofb,mmax,mloc,i+d(1,cn),j+d(2,cn),k+d(3,cn),cn,h,lb,pos_hf,isValid)
-							if (.NOT. (isValid(cn))) then
-								hfk = .FALSE.
-								!goto 100
-							end if						
-						end do
-				
-						!compute normal
-						if (hfk) then
-							call hfNormal(vofb,mloc,mmax,i,j,k,h,lb)		
-						end if	
+						small=tiny(1.d0)
+						!sort
+						mloc_1 = maxloc( abs(mv),1 )
+						m_1 = mv(mloc_1)
+						mv(mloc_1)=small
+						mloc_2 = maxloc( abs(mv),1 )
+						m_2 = mv(mloc_2)
+						mv(mloc_2)=small
+						mloc_3 = maxloc( abs(mv),1 )
+						m_3 = mv(mloc_3)
 						
-					end if				
-					
-				end do
+						do q=1,3
+						
+							mloc=(/mloc_1,mloc_2,mloc_3/)
+							mv=(/m_1,m_2,m_3/)
+						
+							call setStencilPar(mloc(q),d)
+							hfn = .TRUE.
+							do w=1,size(seq)
+								cn=seq(w)
+								call hfColumn(vofb,mv(q),mloc(q),i+d(1,cn),j+d(2,cn),k+d(3,cn),&
+											  cn,h,lb,pos_hf,isValid)
+								lb_seq(w)=lb(cn)
+								h_seq(w)=h(cn)
+								if (.NOT. (isValid(cn))) then
+									hfn = .FALSE.
+								end if						
+							end do		
+							if (hfn) then
+								call hfNormal(vofb,mloc(q),mv(q),i,j,k,h_seq,lb_seq)	
+								goto 100	
+							end if
+							
+						end do
+						
+					end if		
+										
+100				end do
 			end do
-		end do    
+		end do
 		
 		!call correctContantAngle(this,vofb)
 		
@@ -1429,8 +1450,8 @@ contains
         type(vofBlock), intent(inout) :: vofb
         integer, intent(in) :: dir, i, j, k
         real(DP), intent(in) :: m
-        real(DP), dimension(9), intent(inout) :: h
-        integer, dimension(9), intent(inout) :: lb
+        real(DP), dimension(4), intent(inout) :: h
+        integer, dimension(4), intent(inout) :: lb
 		real(DP) :: dhx, dhy
 		integer :: lmax
 		integer :: nc,n1,n2,dir1,dir2
@@ -1476,17 +1497,17 @@ contains
 		
 		!make reference equal
 		if (m < 0.d0) then
-			do q=1,9
+			do q=1,size(h)
 				h(q) = h(q) + sum(df(nc+lb(q)+1:nc+lmax))
 			end do
 		else
-			do q=1,9
+			do q=1,size(h)
 				h(q) = h(q) + sum(df(nc-lmax:nc-lb(q)-1))	
 			end do	
 		end if
 		
-		dhx = (h(6) - h(4))/(dc1(n1+1)+dc1(n1))
-		dhy = (h(8) - h(2))/(dc2(n2+1)+dc2(n2))
+		dhx = (h(3) - h(2))/(dc1(n1+1)+dc1(n1))
+		dhy = (h(4) - h(1))/(dc2(n2+1)+dc2(n2))
 		
 		select case(dir)
 			case(1)
