@@ -17,7 +17,16 @@
 !    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ! ************************************************************************************** !
 
+!select time integration scheme
+! scheme 0 -> B2
+! scheme 1 -> RK3
 time_scheme 0
 
-!k 1.d0
-k 0.5d0
+!select convection scheme
+! scheme 0 -> CD
+! scheme 1 -> UD
+! scheme 2 -> QUICK
+! scheme 3 -> Van Leer
+! scheme 4 -> Superbee
+! scheme 5 -> Local Superbee (based on grad(c))
+convection_scheme 2
