@@ -205,6 +205,9 @@ contains
         type(VOF), intent(in) :: this
         type(field), intent(in) :: c
         type(field), intent(inout) :: cs
+        integer :: smooth_level
+        
+        smooth_level=0
         
         !step 1
         call cellToVertex(c%f_,s_cv,							        &	
@@ -214,8 +217,8 @@ contains
         				  this%mesh_%xc_,this%mesh_%yc_,this%mesh_%zc_,	&
         				  this%mesh_%xf_,this%mesh_%yf_,this%mesh_%zf_)				  
         call updateBoundaries(cs)
-        				  
-		!step 2
+        			  
+		do i=1,smooth_level
         call cellToVertex(cs%f_,s_cv,							        &	
         				  this%mesh_%xc_,this%mesh_%yc_,this%mesh_%zc_,	&
         				  this%mesh_%xf_,this%mesh_%yf_,this%mesh_%zf_)				  
@@ -223,6 +226,7 @@ contains
         				  this%mesh_%xc_,this%mesh_%yc_,this%mesh_%zc_,	&
         				  this%mesh_%xf_,this%mesh_%yf_,this%mesh_%zf_)
 		call updateBoundaries(cs)
+		end do
 		
     end subroutine
 !========================================================================================!
@@ -428,7 +432,6 @@ contains
 		call search_full_interface_cells(this,vofb)
     	
     	call computeNormal_hf(this,vofb)
-		!call computeNormal_youngs(this,vofb)
 		
     	do k=lbk,ubk
     		do j=lbj,ubj
