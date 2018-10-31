@@ -44,7 +44,7 @@ module momentumEqnMod
 		integer :: isz_, iez_, jsz_, jez_, ksz_, kez_
 		
 		!convection scheme parFile
-		real(DP) :: k_
+		integer :: scheme_
 		
 		!keep a pointer to time
 		type(time), pointer :: ptrTime_ => NULL() 
@@ -64,6 +64,13 @@ module momentumEqnMod
 	end type
 	
 	private :: updateConveDiff
+	private :: compute_limiters
+	private :: compute_CD_limiter
+	private :: compute_UD_limiter
+	private :: compute_QUICK_limiter
+	private :: compute_VanLeer_limiter
+	private :: compute_Superbee_limiter
+	private :: compute_localVF_limiter
 	private :: addPressureGrad
 	private :: addSource
 	private :: addConvDiff
@@ -98,7 +105,7 @@ contains
         
         call parFileCTOR(pfile_conv,'schemes','specs')
         !read k convection scheme parameter
-        call readParameter(pfile_conv,this%k_,'k')
+        call readParameter(pfile_conv,this%scheme_,'convection_scheme')
         
         call parFileCTOR(pfile_flow,'flowControl','specs')
         call readParameter(pfile_flow,this%flowCtrl_,'flowCtrl')
@@ -168,14 +175,11 @@ contains
     	call resetFluxes(this)
     	
     	!update fluxes
-    	call updateConveDiff(this,u,mu,rho)
+    	call updateConveDiff(this,u,c,mu,rho)
 		call addConvDiff(this,u)
-    		
-    	!add pressure grad
-    	!call addPressureGrad(this,u,p,rho)
     	
     	!add sources
-    	call addSource(this,u,rho,st,c)
+    	call addSource(this,u,rho,st)
     	
     	!update boundaries
     	call updateBoundariesV(u)
@@ -190,27 +194,28 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-    subroutine updateConveDiff(this,u,mu,rho)
+    subroutine updateConveDiff(this,u,c,mu,rho)
     	type(momentumEqn), intent(inout) :: this
     	type(vfield), intent(in) :: u
-    	type(field), intent(in) :: mu, rho
+    	type(field), intent(in) :: c, mu, rho
     	integer :: im, imm, jm, jmm, km, kmm
     	integer :: ip, ipp, jp, jpp, kp, kpp
     	real(DP) :: qp, Ap, Bp, Fp
     	real(DP) :: qm, Am, Bm, Fm
     	real(DP) :: mur, mul, dxx, dyy, dzz, dxxt, dyyt, dzzt
-    	integer :: i, j, k
-    	real(DP) :: r,invrho
+    	real(DP) :: psi_hpup, psi_hpum, psi_hmup, psi_hmum
+    	integer :: i, j, k, scheme
+    	real(DP) :: invrho
 
     	
-		!k-scheme factor
-		r = 0.25d0*(1.d0 - this%k_)
-		
-		
+		!select scheme
+		scheme=this%scheme_
+
+
 		! x comp
 		
  		!$OMP PARALLEL DO DEFAULT(none) &
-		!$OMP SHARED(this,u,mu,rho,r) &
+		!$OMP SHARED(this,u,c,mu,rho,scheme) &
 		!$OMP PRIVATE(i,j,k) &
 		!$OMP PRIVATE(ip,im,ipp,imm) &
 		!$OMP PRIVATE(jp,jm,jpp,jmm) &
@@ -218,6 +223,7 @@ contains
 		!$OMP PRIVATE(qp,Ap,Bp,Fp) &
 		!$OMP PRIVATE(qm,Am,Bm,Fm) &
 		!$OMP PRIVATE(dxx,dyy,dzz,dxxt,dyyt,dzzt) &
+		!$OMP PRIVATE(psi_hpup,psi_hpum,psi_hmup,psi_hmum) &
 		!$OMP PRIVATE(mur,mul,invrho)
 		do k = this%ksx_,this%kex_
 		
@@ -242,41 +248,59 @@ contains
 		
 							!***********************  convection  ***********************!
 							!d (uu) / dx
+							call compute_limiters(u%ux_%f_(i,j,k),u%ux_%f_(im,j,k),u%ux_%f_(ip,j,k),&
+											      u%ux_%f_(ipp,j,k),u%ux_%f_(imm,j,k),&
+											      c%f_(ip,j,k),c%f_(i,j,k),c%f_(i,jp,k),c%f_(i,jm,k),&
+											      c%f_(i,j,kp),c%f_(i,j,km),&
+											      psi_hpup,psi_hpum,psi_hmup,psi_hmum,scheme)
+
 							qp = 0.5d0*(u%ux_%f_(i,j,k)+u%ux_%f_(ip,j,k))
-							Ap = r*(-u%ux_%f_(im,j,k)+2.d0*u%ux_%f_(i,j,k)-u%ux_%f_(ip,j,k))
-							Bp = r*(-u%ux_%f_(i,j,k)+2.d0*u%ux_%f_(ip,j,k)-u%ux_%f_(ipp,j,k))
-							Fp = qp*0.5d0*(u%ux_%f_(i,j,k)+u%ux_%f_(ip,j,k)) + max(qp,0.d0)*Ap + min(qp,0.d0)*Bp
+							Ap = u%ux_%f_(i,j,k)+0.5d0*psi_hpup*(u%ux_%f_(ip,j,k)-u%ux_%f_(i,j,k))
+							Bp = u%ux_%f_(ip,j,k)+0.5d0*psi_hpum*(u%ux_%f_(i,j,k)-u%ux_%f_(ip,j,k))
+							Fp = max(qp,0.d0)*Ap + min(qp,0.d0)*Bp
 					
 							qm = 0.5d0*(u%ux_%f_(i,j,k)+u%ux_%f_(im,j,k))
-							Am = r*(-u%ux_%f_(imm,j,k)+2.d0*u%ux_%f_(im,j,k)-u%ux_%f_(i,j,k))
-							Bm = r*(-u%ux_%f_(im,j,k)+2.d0*u%ux_%f_(i,j,k)-u%ux_%f_(ip,j,k))
-							Fm = qm*0.5d0*(u%ux_%f_(i,j,k)+u%ux_%f_(im,j,k)) + max(qm,0.d0)*Am + min(qm,0.d0)*Bm
+							Am = u%ux_%f_(im,j,k)+0.5d0*psi_hmup*(u%ux_%f_(i,j,k)-u%ux_%f_(im,j,k))
+							Bm = u%ux_%f_(i,j,k)+0.5d0*psi_hmum*(u%ux_%f_(im,j,k)-u%ux_%f_(i,j,k))
+							Fm = max(qm,0.d0)*Am + min(qm,0.d0)*Bm
 					
 							this%phiX_(i,j,k) = this%phiX_(i,j,k) - (Fp-Fm)/this%ptrMesh_%dxc_(ip)
 					
 							!d (vu) / dy
+							call compute_limiters(u%ux_%f_(i,j,k),u%ux_%f_(i,jm,k),u%ux_%f_(i,jp,k),&
+											      u%ux_%f_(i,jpp,k),u%ux_%f_(i,jmm,k),&
+											      c%f_(ip,j,k),c%f_(i,j,k),c%f_(i,jp,k),c%f_(i,jm,k),&
+											      c%f_(i,j,kp),c%f_(i,j,km),&
+											      psi_hpup,psi_hpum,psi_hmup,psi_hmum,scheme)
+
 							qp = 0.5d0*(u%uy_%f_(ip,j,k)+u%uy_%f_(i,j,k))
-							Ap = r*(-u%ux_%f_(i,jm,k)+2.d0*u%ux_%f_(i,j,k)-u%ux_%f_(i,jp,k))
-							Bp = r*(-u%ux_%f_(i,j,k)+2.d0*u%ux_%f_(i,jp,k)-u%ux_%f_(i,jpp,k))
-							Fp = qp*0.5d0*(u%ux_%f_(i,j,k)+u%ux_%f_(i,jp,k)) + max(qp,0.d0)*Ap + min(qp,0.d0)*Bp
+							Ap = u%ux_%f_(i,j,k)+0.5d0*psi_hpup*(u%ux_%f_(i,jp,k)-u%ux_%f_(i,j,k))
+							Bp = u%ux_%f_(i,jp,k)+0.5d0*psi_hpum*(u%ux_%f_(i,j,k)-u%ux_%f_(i,jp,k))
+							Fp = max(qp,0.d0)*Ap + min(qp,0.d0)*Bp
 					
 							qm = 0.5d0*(u%uy_%f_(ip,jm,k)+u%uy_%f_(i,jm,k))
-							Ap = r*(-u%ux_%f_(i,jmm,k)+2.d0*u%ux_%f_(i,jm,k)-u%ux_%f_(i,j,k))
-							Bp = r*(-u%ux_%f_(i,jm,k)+2.d0*u%ux_%f_(i,j,k)-u%ux_%f_(i,jp,k))
-							Fm = qm*0.5d0*(u%ux_%f_(i,j,k)+u%ux_%f_(i,jm,k)) + max(qm,0.d0)*Ap + min(qm,0.d0)*Bp
+							Am = u%ux_%f_(i,jm,k)+0.5d0*psi_hmup*(u%ux_%f_(i,j,k)-u%ux_%f_(i,jm,k))
+							Bm = u%ux_%f_(i,j,k)+0.5d0*psi_hmum*(u%ux_%f_(i,jm,k)-u%ux_%f_(i,j,k))
+							Fm = max(qm,0.d0)*Am + min(qm,0.d0)*Bm
 					
 							this%phiX_(i,j,k) = this%phiX_(i,j,k) - (Fp-Fm)/this%ptrMesh_%dyf_(j)
 					
 							!d (wu) / dz
+							call compute_limiters(u%ux_%f_(i,j,k),u%ux_%f_(i,j,km),u%ux_%f_(i,j,kp),&
+											      u%ux_%f_(i,j,kpp),u%ux_%f_(i,j,kmm),&
+											      c%f_(ip,j,k),c%f_(i,j,k),c%f_(i,jp,k),c%f_(i,jm,k),&
+											      c%f_(i,j,kp),c%f_(i,j,km),&
+											      psi_hpup,psi_hpum,psi_hmup,psi_hmum,scheme)							
+							
 							qp = 0.5d0*(u%uz_%f_(i,j,k)+u%uz_%f_(ip,j,k))
-							Ap = r*(-u%ux_%f_(i,j,km)+2.d0*u%ux_%f_(i,j,k)-u%ux_%f_(i,j,kp))
-							Bp = r*(-u%ux_%f_(i,j,k)+2.d0*u%ux_%f_(i,j,kp)-u%ux_%f_(i,j,kpp))
-							Fp = qp*0.5d0*(u%ux_%f_(i,j,k)+u%ux_%f_(i,j,kp)) + max(qp,0.d0)*Ap + min(qp,0.d0)*Bp
+							Ap = u%ux_%f_(i,j,k)+0.5d0*psi_hpup*(u%ux_%f_(i,j,kp)-u%ux_%f_(i,j,k))
+							Bp = u%ux_%f_(i,j,kp)+0.5d0*psi_hpum*(u%ux_%f_(i,j,k)-u%ux_%f_(i,j,kp))
+							Fp = max(qp,0.d0)*Ap + min(qp,0.d0)*Bp
 					
 							qm = 0.5d0*(u%uz_%f_(i,j,km)+u%uz_%f_(ip,j,km))
-							Ap = r*(-u%ux_%f_(i,j,kmm)+2.d0*u%ux_%f_(i,j,km)-u%ux_%f_(i,j,k))
-							Bp = r*(-u%ux_%f_(i,j,km)+2.d0*u%ux_%f_(i,j,k)-u%ux_%f_(i,j,kp))
-							Fm = qm*0.5d0*(u%ux_%f_(i,j,k)+u%ux_%f_(i,j,km)) + max(qm,0.d0)*Ap + min(qm,0.d0)*Bp
+							Am = u%ux_%f_(i,j,km)+0.5d0*psi_hmup*(u%ux_%f_(i,j,k)-u%ux_%f_(i,j,km))
+							Bm = u%ux_%f_(i,j,k)+0.5d0*psi_hmum*(u%ux_%f_(i,j,km)-u%ux_%f_(i,j,k))
+							Fm = max(qm,0.d0)*Am + min(qm,0.d0)*Bm
 					
 							this%phiX_(i,j,k) = this%phiX_(i,j,k) - (Fp-Fm)/this%ptrMesh_%dzf_(k)
 							
@@ -320,7 +344,7 @@ contains
 		! y comp
 		
  		!$OMP PARALLEL DO DEFAULT(none) &
-		!$OMP SHARED(this,u,mu,rho,r) &
+		!$OMP SHARED(this,u,c,mu,rho,scheme) &
 		!$OMP PRIVATE(i,j,k) &
 		!$OMP PRIVATE(ip,im,ipp,imm) &
 		!$OMP PRIVATE(jp,jm,jpp,jmm) &
@@ -328,6 +352,7 @@ contains
 		!$OMP PRIVATE(qp,Ap,Bp,Fp) &
 		!$OMP PRIVATE(qm,Am,Bm,Fm) &
 		!$OMP PRIVATE(dxx,dyy,dzz,dxxt,dyyt,dzzt) &
+		!$OMP PRIVATE(psi_hpup,psi_hpum,psi_hmup,psi_hmum) &
 		!$OMP PRIVATE(mur,mul,invrho)
 		do k = this%ksy_,this%key_
 		
@@ -352,45 +377,63 @@ contains
 					
 							!***********************  convection  ***********************!
 							!d (uv) / dx
+							call compute_limiters(u%uy_%f_(i,j,k),u%uy_%f_(im,j,k),u%uy_%f_(ip,j,k),&
+											      u%uy_%f_(ipp,j,k),u%uy_%f_(imm,j,k),&
+											      c%f_(ip,j,k),c%f_(im,j,k),c%f_(i,jp,k),c%f_(i,j,k),&
+											      c%f_(i,j,kp),c%f_(i,j,km),&
+											      psi_hpup,psi_hpum,psi_hmup,psi_hmum,scheme)
+
 							qp = 0.5d0*(u%ux_%f_(i,jp,k)*this%ptrMesh_%dyf_(jp)+ &
 							            u%ux_%f_(i,j,k)*this%ptrMesh_%dyf_(j))/this%ptrMesh_%dyc_(jp)
-							Ap = r*(-u%uy_%f_(im,j,k)+2.d0*u%uy_%f_(i,j,k)-u%uy_%f_(ip,j,k))
-							Bp = r*(-u%uy_%f_(i,j,k)+2.d0*u%uy_%f_(ip,j,k)-u%uy_%f_(ipp,j,k))
-							Fp = qp*0.5d0*(u%uy_%f_(i,j,k)+u%uy_%f_(ip,j,k)) + max(qp,0.d0)*Ap + min(qp,0.d0)*Bp
+							Ap = u%uy_%f_(i,j,k)+0.5d0*psi_hpup*(u%uy_%f_(ip,j,k)-u%uy_%f_(i,j,k))
+							Bp = u%uy_%f_(ip,j,k)+0.5d0*psi_hpum*(u%uy_%f_(i,j,k)-u%uy_%f_(ip,j,k))
+							Fp = max(qp,0.d0)*Ap + min(qp,0.d0)*Bp
 					
 							qm = 0.5d0*(u%ux_%f_(im,jp,k)*this%ptrMesh_%dyf_(jp)+ &
 							            u%ux_%f_(im,j,k)*this%ptrMesh_%dyf_(j))/this%ptrMesh_%dyc_(jp)
-							Am = r*(-u%uy_%f_(imm,j,k)+2.d0*u%uy_%f_(im,j,k)-u%uy_%f_(i,j,k))
-							Bm = r*(-u%uy_%f_(im,j,k)+2.d0*u%uy_%f_(i,j,k)-u%uy_%f_(ip,j,k))
-							Fm = qm*0.5d0*(u%uy_%f_(i,j,k)+u%uy_%f_(im,j,k)) + max(qm,0.d0)*Ap + min(qm,0.d0)*Bp
+							Am = u%uy_%f_(im,j,k)+0.5d0*psi_hmup*(u%uy_%f_(i,j,k)-u%uy_%f_(im,j,k))
+							Bm = u%uy_%f_(i,j,k)+0.5d0*psi_hmum*(u%uy_%f_(im,j,k)-u%uy_%f_(i,j,k))
+							Fm = max(qm,0.d0)*Am + min(qm,0.d0)*Bm
 					
-							this%phiY_(i,j,k) = this%phiY_(i,j,k) - (Fp-Fm)/this%ptrMesh_%dxf_(i)				
+							this%phiY_(i,j,k) = this%phiY_(i,j,k) - (Fp-Fm)/this%ptrMesh_%dxf_(i)					
 				
 							!d (vv) / dy
+							call compute_limiters(u%uy_%f_(i,j,k),u%uy_%f_(i,jm,k),u%uy_%f_(i,jp,k),&
+											      u%uy_%f_(i,jpp,k),u%uy_%f_(i,jmm,k),&
+											      c%f_(ip,j,k),c%f_(im,j,k),c%f_(i,jp,k),c%f_(i,j,k),&
+											      c%f_(i,j,kp),c%f_(i,j,km),&
+											      psi_hpup,psi_hpum,psi_hmup,psi_hmum,scheme)
+							
 							qp = 0.5d0*(u%uy_%f_(i,j,k)+u%uy_%f_(i,jp,k))
-							Ap = r*(-u%uy_%f_(i,jm,k)+2.d0*u%uy_%f_(i,j,k)-u%uy_%f_(i,jp,k))
-							Bp = r*(-u%uy_%f_(i,j,k)+2.d0*u%uy_%f_(i,jp,k)-u%uy_%f_(i,jpp,k))
-							Fp = qp*0.5d0*(u%uy_%f_(i,j,k)+u%uy_%f_(i,jp,k)) + max(qp,0.d0)*Ap + min(qp,0.d0)*Bp
+							Ap = u%uy_%f_(i,j,k)+0.5d0*psi_hpup*(u%uy_%f_(i,jp,k)-u%uy_%f_(i,j,k))
+							Bp = u%uy_%f_(i,jp,k)+0.5d0*psi_hpum*(u%uy_%f_(i,j,k)-u%uy_%f_(i,jp,k))
+							Fp = max(qp,0.d0)*Ap + min(qp,0.d0)*Bp
 					
 							qm = 0.5d0*(u%uy_%f_(i,j,k)+u%uy_%f_(i,jm,k))
-							Am = r*(-u%uy_%f_(i,jmm,k)+2.d0*u%uy_%f_(i,jm,k)-u%uy_%f_(i,j,k))
-							Bm = r*(-u%uy_%f_(i,jm,k)+2.d0*u%uy_%f_(i,j,k)-u%uy_%f_(i,jp,k))
-							Fm = qm*0.5d0*(u%uy_%f_(i,j,k)+u%uy_%f_(i,jm,k)) + max(qm,0.d0)*Ap + min(qm,0.d0)*Bp
+							Am = u%uy_%f_(i,jm,k)+0.5d0*psi_hmup*(u%uy_%f_(i,j,k)-u%uy_%f_(i,jm,k))
+							Bm = u%uy_%f_(i,j,k)+0.5d0*psi_hmum*(u%uy_%f_(i,jm,k)-u%uy_%f_(i,j,k))
+							Fm = max(qm,0.d0)*Am + min(qm,0.d0)*Bm
 					
 							this%phiY_(i,j,k) = this%phiY_(i,j,k) - (Fp-Fm)/this%ptrMesh_%dyc_(jp)
 					
 							!d (wv) / dz
+							call compute_limiters(u%uy_%f_(i,j,k),u%uy_%f_(i,j,km),u%uy_%f_(i,j,kp),&
+											      u%uy_%f_(i,j,kpp),u%uy_%f_(i,j,kmm),&
+											      c%f_(ip,j,k),c%f_(im,j,k),c%f_(i,jp,k),c%f_(i,j,k),&
+											      c%f_(i,j,kp),c%f_(i,j,km),&
+											      psi_hpup,psi_hpum,psi_hmup,psi_hmum,scheme)
+											      
 							qp = 0.5d0*(u%uz_%f_(i,jp,k)*this%ptrMesh_%dyf_(jp)+ &
 									    u%uz_%f_(i,j,k)*this%ptrMesh_%dyf_(j))/this%ptrMesh_%dyc_(jp)
-							Ap = r*(-u%uy_%f_(i,j,km)+2.d0*u%uy_%f_(i,j,k)-u%uy_%f_(i,j,kp))
-							Bp = r*(-u%uy_%f_(i,j,k)+2.d0*u%uy_%f_(i,j,kp)-u%uy_%f_(i,j,kpp))
-							Fp = qp*0.5d0*(u%uy_%f_(i,j,k)+u%uy_%f_(i,j,kp)) + max(qp,0.d0)*Ap + min(qp,0.d0)*Bp
+							Ap = u%uy_%f_(i,j,k)+0.5d0*psi_hpup*(u%uy_%f_(i,j,kp)-u%uy_%f_(i,j,k))
+							Bp = u%uy_%f_(i,j,kp)+0.5d0*psi_hpum*(u%uy_%f_(i,j,k)-u%uy_%f_(i,j,kp))
+							Fp = max(qp,0.d0)*Ap + min(qp,0.d0)*Bp
 					
 							qm = 0.5d0*(u%uz_%f_(i,jp,km)*this%ptrMesh_%dyf_(jp)+ &
 									    u%uz_%f_(i,j,km)*this%ptrMesh_%dyf_(j))/this%ptrMesh_%dyc_(jp)
-							Am = r*(-u%uy_%f_(i,j,kmm)+2.d0*u%uy_%f_(i,j,km)-u%uy_%f_(i,j,k))
-							Bm = r*(-u%uy_%f_(i,j,km)+2.d0*u%uy_%f_(i,j,k)-u%uy_%f_(i,j,kp))
-							Fm = qm*0.5d0*(u%uy_%f_(i,j,k)+u%uy_%f_(i,j,km)) + max(qm,0.d0)*Ap + min(qm,0.d0)*Bp
+							Am = u%uy_%f_(i,j,km)+0.5d0*psi_hmup*(u%uy_%f_(i,j,k)-u%uy_%f_(i,j,km))
+							Bm = u%uy_%f_(i,j,k)+0.5d0*psi_hmum*(u%uy_%f_(i,j,km)-u%uy_%f_(i,j,k))
+							Fm = max(qm,0.d0)*Am + min(qm,0.d0)*Bm
 					
 							this%phiY_(i,j,k) = this%phiY_(i,j,k) - (Fp-Fm)/this%ptrMesh_%dzf_(k)
 							
@@ -435,7 +478,7 @@ contains
 		! z comp
 		
  		!$OMP PARALLEL DO DEFAULT(none) &
-		!$OMP SHARED(this,u,mu,rho,r) &
+		!$OMP SHARED(this,u,c,mu,rho,scheme) &
 		!$OMP PRIVATE(i,j,k) &
 		!$OMP PRIVATE(ip,im,ipp,imm) &
 		!$OMP PRIVATE(jp,jm,jpp,jmm) &
@@ -443,6 +486,7 @@ contains
 		!$OMP PRIVATE(qp,Ap,Bp,Fp) &
 		!$OMP PRIVATE(qm,Am,Bm,Fm) &
 		!$OMP PRIVATE(dxx,dyy,dzz,dxxt,dyyt,dzzt) &
+		!$OMP PRIVATE(psi_hpup,psi_hpum,psi_hmup,psi_hmum) &
 		!$OMP PRIVATE(mur,mul,invrho)
 		do k = this%ksz_,this%kez_
 		
@@ -467,43 +511,60 @@ contains
 
 							!***********************  convection  ***********************!
 							!d (uw) / dx
+							call compute_limiters(u%uz_%f_(i,j,k),u%uz_%f_(im,j,k),u%uz_%f_(ip,j,k),&
+											      u%uz_%f_(ipp,j,k),u%uz_%f_(imm,j,k),&
+											      c%f_(ip,j,k),c%f_(im,j,k),c%f_(i,jp,k),c%f_(i,jm,k),&
+											      c%f_(i,j,kp),c%f_(i,j,k),&
+											      psi_hpup,psi_hpum,psi_hmup,psi_hmum,scheme)			
+						
 							qp = 0.5d0*(u%ux_%f_(i,j,k)+u%ux_%f_(i,j,kp))
-							Ap = r*(-u%uz_%f_(im,j,k)+2.d0*u%uz_%f_(i,j,k)-u%uz_%f_(ip,j,k))
-							Bp = r*(-u%uz_%f_(i,j,k)+2.d0*u%uz_%f_(ip,j,k)-u%uz_%f_(ipp,j,k))
-							Fp = qp*0.5d0*(u%uz_%f_(i,j,k)+u%uz_%f_(ip,j,k)) + max(qp,0.d0)*Ap + min(qp,0.d0)*Bp
+							Ap = u%uz_%f_(i,j,k)+0.5d0*psi_hpup*(u%uz_%f_(ip,j,k)-u%uz_%f_(i,j,k))
+							Bp = u%uz_%f_(ip,j,k)+0.5d0*psi_hpum*(u%uz_%f_(i,j,k)-u%uz_%f_(ip,j,k))
+							Fp = max(qp,0.d0)*Ap + min(qp,0.d0)*Bp
 					
 							qm = 0.5d0*(u%ux_%f_(im,j,k)+u%ux_%f_(im,j,kp))
-							Am = r*(-u%uz_%f_(imm,j,k)+2.d0*u%uz_%f_(im,j,k)-u%uz_%f_(i,j,k))
-							Bm = r*(-u%uz_%f_(im,j,k)+2.d0*u%uz_%f_(i,j,k)-u%uz_%f_(ip,j,k))
-							Fm = qm*0.5d0*(u%uz_%f_(i,j,k)+u%uz_%f_(im,j,k)) + max(qm,0.d0)*Ap + min(qm,0.d0)*Bp
+							Am = u%uz_%f_(im,j,k)+0.5d0*psi_hmup*(u%uz_%f_(i,j,k)-u%uz_%f_(im,j,k))
+							Bm = u%uz_%f_(i,j,k)+0.5d0*psi_hmum*(u%uz_%f_(im,j,k)-u%uz_%f_(i,j,k))
+							Fm = max(qm,0.d0)*Am + min(qm,0.d0)*Bm
 					
 							this%phiZ_(i,j,k) = this%phiZ_(i,j,k) - (Fp-Fm)/this%ptrMesh_%dxf_(i)	
 					
 							!d (vw) / dy
+							call compute_limiters(u%uz_%f_(i,j,k),u%uz_%f_(i,jm,k),u%uz_%f_(i,jp,k),&
+											      u%uz_%f_(i,jpp,k),u%uz_%f_(i,jmm,k),&
+											      c%f_(ip,j,k),c%f_(im,j,k),c%f_(i,jp,k),c%f_(i,jm,k),&
+											      c%f_(i,j,kp),c%f_(i,j,k),&
+											      psi_hpup,psi_hpum,psi_hmup,psi_hmum,scheme)
+											      
 							qp = 0.5d0*(u%uy_%f_(i,j,k)+u%uy_%f_(i,j,kp))
-							Ap = r*(-u%uz_%f_(i,jm,k)+2.d0*u%uz_%f_(i,j,k)-u%uz_%f_(i,jp,k))
-							Bp = r*(-u%uz_%f_(i,j,k)+2.d0*u%uz_%f_(i,jp,k)-u%uz_%f_(i,jpp,k))
-							Fp = qp*0.5d0*(u%uz_%f_(i,j,k)+u%uz_%f_(i,jp,k)) + max(qp,0.d0)*Ap + min(qp,0.d0)*Bp
+							Ap = u%uz_%f_(i,j,k)+0.5d0*psi_hpup*(u%uz_%f_(i,jp,k)-u%uz_%f_(i,j,k))
+							Bp = u%uz_%f_(i,jp,k)+0.5d0*psi_hpum*(u%uz_%f_(i,j,k)-u%uz_%f_(i,jp,k))
+							Fp = max(qp,0.d0)*Ap + min(qp,0.d0)*Bp
 					
 							qm = 0.5d0*(u%uy_%f_(i,jm,k)+u%uy_%f_(i,jm,kp))
-							Am = r*(-u%uz_%f_(i,jmm,k)+2.d0*u%uz_%f_(i,jm,k)-u%uz_%f_(i,j,k))
-							Bm = r*(-u%uz_%f_(i,jm,k)+2.d0*u%uz_%f_(i,j,k)-u%uz_%f_(i,jp,k))
-							Fm = qm*0.5d0*(u%uz_%f_(i,j,k)+u%uz_%f_(i,jm,k)) + max(qm,0.d0)*Ap + min(qm,0.d0)*Bp
+							Am = u%uz_%f_(i,jm,k)+0.5d0*psi_hmup*(u%uz_%f_(i,j,k)-u%uz_%f_(i,jm,k))
+							Bm = u%uz_%f_(i,j,k)+0.5d0*psi_hmum*(u%uz_%f_(i,jm,k)-u%uz_%f_(i,j,k))
+							Fm = max(qm,0.d0)*Am + min(qm,0.d0)*Bm
 					
 							this%phiZ_(i,j,k) = this%phiZ_(i,j,k) - (Fp-Fm)/this%ptrMesh_%dyf_(j)	
 					
 							!d (ww) / dz
+							call compute_limiters(u%uz_%f_(i,j,k),u%uz_%f_(i,j,km),u%uz_%f_(i,j,kp),&
+											      u%uz_%f_(i,j,kpp),u%uz_%f_(i,j,kmm),&
+											      c%f_(ip,j,k),c%f_(im,j,k),c%f_(i,jp,k),c%f_(i,jm,k),&
+											      c%f_(i,j,kp),c%f_(i,j,k),&
+											      psi_hpup,psi_hpum,psi_hmup,psi_hmum,scheme)
 							qp = 0.5d0*(u%uz_%f_(i,j,k)+u%uz_%f_(i,j,kp))
-							Ap = r*(-u%uz_%f_(i,j,km)+2.d0*u%uz_%f_(i,j,k)-u%uz_%f_(i,j,kp))
-							Bp = r*(-u%uz_%f_(i,j,k)+2.d0*u%uz_%f_(i,j,kp)-u%uz_%f_(i,j,kpp))
-							Fp = qp*0.5d0*(u%uz_%f_(i,j,k)+u%uz_%f_(i,j,kp)) + max(qp,0.d0)*Ap + min(qp,0.d0)*Bp
+							Ap = u%uz_%f_(i,j,k)+0.5d0*psi_hpup*(u%uz_%f_(i,j,kp)-u%uz_%f_(i,j,k))
+							Bp = u%uz_%f_(i,j,kp)+0.5d0*psi_hpum*(u%uz_%f_(i,j,k)-u%uz_%f_(i,j,kp))
+							Fp = max(qp,0.d0)*Ap + min(qp,0.d0)*Bp
 					
 							qm = 0.5d0*(u%uz_%f_(i,j,k)+u%uz_%f_(i,j,km))
-							Am = r*(-u%uz_%f_(i,j,kmm)+2.d0*u%uz_%f_(i,j,km)-u%uz_%f_(i,j,k))
-							Bm = r*(-u%uz_%f_(i,j,km)+2.d0*u%uz_%f_(i,j,k)-u%uz_%f_(i,j,kp))
-							Fm = qm*0.5d0*(u%uz_%f_(i,j,k)+u%uz_%f_(i,j,km)) + max(qm,0.d0)*Ap + min(qm,0.d0)*Bp
+							Am = u%uz_%f_(i,j,km)+0.5d0*psi_hmup*(u%uz_%f_(i,j,k)-u%uz_%f_(i,j,km))
+							Bm = u%uz_%f_(i,j,k)+0.5d0*psi_hmum*(u%uz_%f_(i,j,km)-u%uz_%f_(i,j,k))
+							Fm = max(qm,0.d0)*Am + min(qm,0.d0)*Bm
 					
-							this%phiZ_(i,j,k) = this%phiZ_(i,j,k) - (Fp-Fm)/this%ptrMesh_%dzc_(kp)	
+							this%phiZ_(i,j,k) = this%phiZ_(i,j,k) - (Fp-Fm)/this%ptrMesh_%dzc_(kp)
 							
 							!***********************  diffusion  ***********************!
 							mur = 0.25d0*(mu%f_(i,j,k)+mu%f_(i,j,kp)+mu%f_(ip,j,k)+mu%f_(ip,j,kp))
@@ -542,6 +603,135 @@ contains
 		!$OMP END PARALLEL DO 
 	
 				
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
+    subroutine compute_limiters(vc,vm,vp,vpp,vmm,cxp,cxm,cyp,cym,czp,czm,&
+    							psi_hpup,psi_hpum,psi_hmup,psi_hmum,scheme)
+    	real(DP), intent(in) ::  vc,vm,vp,vpp,vmm,cxp,cxm,cyp,cym,czp,czm
+    	real(DP), intent(out) ::  psi_hpup,psi_hpum,psi_hmup,psi_hmum
+    	integer, intent(in) :: scheme
+    	real(DP) :: small,r_hpup,r_hpum,r_hmup,r_hmum
+    	
+    	small=tiny(0.d0)
+
+    	select case(scheme)
+    		case(0)
+    			call compute_CD_limiter(psi_hpup)
+    			call compute_CD_limiter(psi_hpum)
+    			call compute_CD_limiter(psi_hmup)
+    			call compute_CD_limiter(psi_hmum)
+    			return
+    		case(1)
+    			call compute_UD_limiter(psi_hpup)
+    			call compute_UD_limiter(psi_hpum)
+    			call compute_UD_limiter(psi_hmup)
+    			call compute_UD_limiter(psi_hmum)
+    			return  		
+    		case default
+    	end select
+  
+		r_hpup = (vc-vm)/(vp-vc+small)
+		r_hpum = (vpp-vp)/(vp-vc+small)
+		r_hmup = (vm-vmm)/(vc-vm+small)
+		r_hmum = (vp-vc)/(vc-vm+small)
+    	
+    	select case(scheme)
+    		case(2)
+    			call compute_QUICK_limiter(r_hpup,psi_hpup)
+    			call compute_QUICK_limiter(r_hpum,psi_hpum)
+    			call compute_QUICK_limiter(r_hmup,psi_hmup)
+    			call compute_QUICK_limiter(r_hmum,psi_hmum)	
+    		case(3)
+    			call compute_VanLeer_limiter(r_hpup,psi_hpup)
+    			call compute_VanLeer_limiter(r_hpum,psi_hpum)
+    			call compute_VanLeer_limiter(r_hmup,psi_hmup)
+    			call compute_VanLeer_limiter(r_hmum,psi_hmum)
+    		case(4)
+    			call compute_Superbee_limiter(r_hpup,psi_hpup)
+    			call compute_Superbee_limiter(r_hpum,psi_hpum)
+    			call compute_Superbee_limiter(r_hmup,psi_hmup)
+    			call compute_Superbee_limiter(r_hmum,psi_hmum)
+    		case(5)
+    			call compute_localVF_limiter(r_hpup,psi_hpup,cxp,cxm,cyp,cym,czp,czm)
+    			call compute_localVF_limiter(r_hpum,psi_hpum,cxp,cxm,cyp,cym,czp,czm)
+    			call compute_localVF_limiter(r_hmup,psi_hmup,cxp,cxm,cyp,cym,czp,czm)
+    			call compute_localVF_limiter(r_hmum,psi_hmum,cxp,cxm,cyp,cym,czp,czm)
+    		case default
+    	end select
+    	
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
+    subroutine compute_CD_limiter(psi)
+    	real(DP), intent(out) :: psi
+			
+		psi = 1.d0
+			
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
+    subroutine compute_UD_limiter(psi)
+    	real(DP), intent(out) :: psi
+			
+		psi = 0.d0
+			
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
+    subroutine compute_QUICK_limiter(r,psi)
+    	real(DP), intent(in) :: r
+    	real(DP), intent(out) :: psi
+			
+		psi = (r+3.d0)/4.d0
+			
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
+    subroutine compute_VanLeer_limiter(r,psi)
+    	real(DP), intent(inout) :: r
+    	real(DP), intent(out) :: psi
+			
+		r = max(0.d0,r)
+    	psi = (r+abs(r))/(1.d0+abs(r))
+    		
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
+    subroutine compute_Superbee_limiter(r,psi)
+    	real(DP), intent(inout) :: r
+    	real(DP), intent(out) :: psi
+			
+		r = max(0.d0,r)
+    	psi = maxval((/0.d0,min(2.d0*r,1.d0),min(r,2.d0)/))
+    		
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
+    subroutine compute_localVF_limiter(r,psi,cxp,cxm,cyp,cym,czp,czm)
+    	real(DP), intent(inout) :: r
+    	real(DP), intent(out) :: psi
+    	real(DP), intent(in) :: cxp,cxm,cyp,cym,czp,czm
+    	real(DP) :: dcx,dcy,dcz,small
+    	
+    	dcx=cxp-cxm
+    	dcy=cyp-cym
+    	dcz=czp-czm
+    	small=epsilon(0.d0)
+    	
+    	if ((dcx>small).OR.(dcy>small).OR.(dcz>small)) then
+    		call compute_Superbee_limiter(r,psi)
+    	else
+    		call compute_CD_limiter(psi)
+    	end if
+    	
     end subroutine
 !========================================================================================!
 
@@ -682,10 +872,10 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-    subroutine addSource(this,u,rho,st,c)
+    subroutine addSource(this,u,rho,st)
     	type(momentumEqn), intent(in) :: this
     	type(vfield), intent(inout) :: u
-    	type(field), intent(in) :: rho, c
+    	type(field), intent(in) :: rho
     	type(vfield), intent(in) :: st
     	type(grid), pointer :: mesh
     	real(DP) :: dt, alpha
@@ -695,11 +885,11 @@ contains
     	dt = this%ptrTime_%dt_
     	alpha = alphaRKS(this%ptrTime_)
     	
-    	mesh => c%ptrMesh_
+    	mesh => rho%ptrMesh_
 		
 		!x comp
  		!$OMP PARALLEL DO DEFAULT(none) &
-		!$OMP SHARED(this,mesh,u,rho,st,c) &
+		!$OMP SHARED(this,mesh,u,rho,st) &
 		!$OMP SHARED(dt,alpha) &
 		!$OMP PRIVATE(i,j,k) &
 		!$OMP PRIVATE(invrho,r)	
@@ -720,7 +910,7 @@ contains
 		
 		!y comp
  		!$OMP PARALLEL DO DEFAULT(none) &
-		!$OMP SHARED(this,mesh,u,rho,st,c) &
+		!$OMP SHARED(this,mesh,u,rho,st) &
 		!$OMP SHARED(dt,alpha) &
 		!$OMP PRIVATE(i,j,k) &
 		!$OMP PRIVATE(invrho,r)
@@ -740,7 +930,7 @@ contains
 		
 		!z comp
  		!$OMP PARALLEL DO DEFAULT(none) &
-		!$OMP SHARED(this,mesh,u,rho,st,c) &
+		!$OMP SHARED(this,mesh,u,rho,st) &
 		!$OMP SHARED(dt,alpha) &
 		!$OMP PRIVATE(i,j,k) &
 		!$OMP PRIVATE(invrho,r)
