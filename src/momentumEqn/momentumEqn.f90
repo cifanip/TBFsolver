@@ -104,7 +104,7 @@ contains
         logical :: read_fr
         
         call parFileCTOR(pfile_conv,'schemes','specs')
-        !read k convection scheme parameter
+        !read convection scheme
         call readParameter(pfile_conv,this%scheme_,'convection_scheme')
         
         call parFileCTOR(pfile_flow,'flowControl','specs')
