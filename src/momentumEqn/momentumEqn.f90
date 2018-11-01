@@ -612,9 +612,7 @@ contains
     	real(DP), intent(in) ::  vc,vm,vp,vpp,vmm,cxp,cxm,cyp,cym,czp,czm
     	real(DP), intent(out) ::  psi_hpup,psi_hpum,psi_hmup,psi_hmum
     	integer, intent(in) :: scheme
-    	real(DP) :: small,r_hpup,r_hpum,r_hmup,r_hmum
-    	
-    	small=tiny(0.d0)
+    	real(DP) :: r_hpup,r_hpum,r_hmup,r_hmum
 
     	select case(scheme)
     		case(0)
@@ -632,10 +630,10 @@ contains
     		case default
     	end select
   
-		r_hpup = (vc-vm)/(vp-vc+small)
-		r_hpum = (vpp-vp)/(vp-vc+small)
-		r_hmup = (vm-vmm)/(vc-vm+small)
-		r_hmum = (vp-vc)/(vc-vm+small)
+		r_hpup = (vc-vm)/approx_zero(vp-vc)
+		r_hpum = (vpp-vp)/approx_zero(vp-vc)
+		r_hmup = (vm-vmm)/approx_zero(vc-vm)
+		r_hmum = (vp-vc)/approx_zero(vc-vm)
     	
     	select case(scheme)
     		case(2)
