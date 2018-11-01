@@ -33,6 +33,7 @@ module auxiliaryRoutinesMod
 	public :: computeVorticity	
 	public :: setFlowRate
 	public :: computeFlowRate
+	public :: approx_zero
 	
 contains
 
@@ -146,7 +147,7 @@ contains
 		real(DP), intent(in) :: cfl
 		type(grid), pointer :: mesh
 		type(mpiControl), pointer :: mpic
-		real(DP) :: cx,cy,cz,dt,dt_g,small
+		real(DP) :: cx,cy,cz,dt,dt_g
 		integer :: i,j,k,nx,ny,nz
 		integer :: ierror
         
@@ -155,14 +156,12 @@ contains
         
         dt = huge(0.d0)
         
-        small = tiny(0.d0)
-        
         nx = mesh%nx_
         ny = mesh%ny_
         nz = mesh%nz_       
         
 		!$OMP PARALLEL DO DEFAULT(none) &
-		!$OMP SHARED(u,mesh,cfl,small) &
+		!$OMP SHARED(u,mesh,cfl) &
 		!$OMP SHARED(nx,ny,nz) &
 		!$OMP PRIVATE(cx,cy,cz) &
 		!$OMP PRIVATE(i,j,k) &
@@ -175,7 +174,7 @@ contains
         			cy = abs(0.5d0*(u%uy_%f_(i,j,k)+u%uy_%f_(i,j-1,k)))/mesh%dyf_(j)
         			cz = abs(0.5d0*(u%uz_%f_(i,j,k)+u%uz_%f_(i,j,k-1)))/mesh%dzf_(k)
         			
-        			dt = min(cfl/(cx+cy+cz+small),dt)
+        			dt = min(cfl/approx_zero(cx+cy+cz),dt)
         			
         		end do
         	end do
@@ -548,6 +547,22 @@ contains
     					   mpic%cartComm_, ierror)
     
     end subroutine
+!========================================================================================!
+
+!========================================================================================!
+    elemental function approx_zero(d) result(r)
+    	real(DP), intent(in) :: d
+    	real(DP) :: r,small
+    	
+    	small = 1.d-50
+    	
+    	if (d==0.d0) then
+    		r=small
+    	else
+    		r=d
+    	end if
+
+    end function
 !========================================================================================!
 
 	
