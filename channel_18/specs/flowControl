@@ -19,6 +19,7 @@
 ! <1 or >2 = switch off control
 !1 = fixed pressure gradient
 !2 = fixed flow rate
+!3 = balance gravity force - fully periodic box (g is along x)
 
 flowCtrl 1
 Ret 127.3d0
