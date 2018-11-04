@@ -466,7 +466,6 @@ contains
     	type(VOF), intent(in) :: this
     	type(vofBlock), intent(inout) :: vofb
     	integer :: lbi,ubi,lbj,ubj,lbk,ubk,i,j,k
-    	real(DP) :: swx,swy,swz
     	logical :: full_inter_found
     	
 		lbi = lbound(vofb%c,1)
