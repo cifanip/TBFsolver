@@ -406,18 +406,12 @@ contains
 		nyg = mesh%nyg_
 		nzg = mesh%nzg_
 		
-		if (INIT_TYPE==UPDATE_BLK) then		
+		if (INIT_TYPE==UPDATE_BLK) then
 			!tmp copy vof field
-			lbi=lbound(vofb%c,1)
-			ubi=ubound(vofb%c,1)
-			lbj=lbound(vofb%c,2)
-			ubj=ubound(vofb%c,2)
-			lbk=lbound(vofb%c,3)
-			ubk=ubound(vofb%c,3)
-			call reAllocateArray(tmp_c,lbi,ubi,lbj,ubj,lbk,ubk)
-			call reAllocateArray(tmp_c0,lbi,ubi,lbj,ubj,lbk,ubk)
-			tmp_c = vofb%c
-			tmp_c0 = vofb%c0
+			call reAllocateArray(tmp_c,is-1,ie+1,js-1,je+1,ks-1,ke+1)
+			call reAllocateArray(tmp_c0,is-1,ie+1,js-1,je+1,ks-1,ke+1)
+			tmp_c = vofb%c(is-1:ie+1,js-1:je+1,ks-1:ke+1)
+			tmp_c0 = vofb%c0(is-1:ie+1,js-1:je+1,ks-1:ke+1)
 			
 			!reset periodic 
 			if ((is>nxg).OR.(ie<1)) then
@@ -470,14 +464,8 @@ contains
 				vofb%c(is:ie,js:je,ks:ke)=c_blk
 
 			case(UPDATE_BLK)
-				lbi=max(is-offset_c,lbi)
-				lbj=max(js-offset_c,lbj)
-				lbk=max(ks-offset_c,lbk)
-				ubi=min(ie+offset_c,ubi)
-				ubj=min(je+offset_c,ubj)
-				ubk=min(ke+offset_c,ubk)
-				vofb%c(lbi:ubi,lbj:ubj,lbk:ubk) = tmp_c(lbi:ubi,lbj:ubj,lbk:ubk)
-				vofb%c0(lbi:ubi,lbj:ubj,lbk:ubk) = tmp_c0(lbi:ubi,lbj:ubj,lbk:ubk)
+				vofb%c(is-1:ie+1,js-1:je+1,ks-1:ke+1) = tmp_c
+				vofb%c0(is-1:ie+1,js-1:je+1,ks-1:ke+1) = tmp_c0
 			
 			case(REDISTRIBUTION_BLK)
 				lbi=lbound(tmp_c,1)
