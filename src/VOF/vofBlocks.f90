@@ -400,7 +400,7 @@ contains
     	real(DP), allocatable, dimension(:,:,:), intent(inout) :: tmp_c,tmp_c0
     	real(DP), allocatable, dimension(:,:,:) :: c_blk
     	real(DP) :: x0,y0,z0,R
-    	integer :: nxg,nyg,nzg,nref
+    	integer :: nxg,nyg,nzg,nref,lbi,lbj,lbk,ubi,ubj,ubk
 		
 		nxg = mesh%nxg_
 		nyg = mesh%nyg_
@@ -408,10 +408,16 @@ contains
 		
 		if (INIT_TYPE==UPDATE_BLK) then		
 			!tmp copy vof field
-			call reAllocateArray(tmp_c,is,ie,js,je,ks,ke)
-			call reAllocateArray(tmp_c0,is,ie,js,je,ks,ke)
-			tmp_c = vofb%c(is:ie,js:je,ks:ke)
-			tmp_c0 = vofb%c0(is:ie,js:je,ks:ke)
+			lbi=lbound(vofb%c,1)
+			ubi=ubound(vofb%c,1)
+			lbj=lbound(vofb%c,2)
+			ubj=ubound(vofb%c,2)
+			lbk=lbound(vofb%c,3)
+			ubk=ubound(vofb%c,3)
+			call reAllocateArray(tmp_c,lbi,ubi,lbj,ubj,lbk,ubk)
+			call reAllocateArray(tmp_c0,lbi,ubi,lbj,ubj,lbk,ubk)
+			tmp_c = vofb%c
+			tmp_c0 = vofb%c0
 			
 			!reset periodic 
 			if ((is>nxg).OR.(ie<1)) then
@@ -463,10 +469,20 @@ contains
     			call init_Bubble_vf(gmesh,c_blk,x0,y0,z0,R,nref)
 				vofb%c(is:ie,js:je,ks:ke)=c_blk
 
-			case(UPDATE_BLK,REDISTRIBUTION_BLK)
+			case(UPDATE_BLK)
+				lbi=max(is-offset_c,lbi)
+				lbj=max(js-offset_c,lbj)
+				lbk=max(ks-offset_c,lbk)
+				ubi=min(ie+offset_c,ubi)
+				ubj=min(je+offset_c,ubj)
+				ubk=min(ke+offset_c,ubk)
+				vofb%c(lbi:ubi,lbj:ubj,lbk:ubk) = tmp_c(lbi:ubi,lbj:ubj,lbk:ubk)
+				vofb%c0(lbi:ubi,lbj:ubj,lbk:ubk) = tmp_c0(lbi:ubi,lbj:ubj,lbk:ubk)
+			
+			case(REDISTRIBUTION_BLK)
 				vofb%c(is:ie,js:je,ks:ke) = tmp_c
 				vofb%c0(is:ie,js:je,ks:ke) = tmp_c0
-				
+								
 			case(REINIT_BLK)
 				vofb%c = tmp_c
 				vofb%c0 = tmp_c0
@@ -499,12 +515,12 @@ contains
 		ks = lbound(vofb%c,3)
 		ke = ubound(vofb%c,3) 
 			
-    	imax=min(is,js,ks)-1
-    	jmax=min(is,js,ks)-1
-    	kmax=min(is,js,ks)-1
-    	imin=ie+je+ke
-    	jmin=ie+je+ke
-    	kmin=ie+je+ke
+    	imax=-huge(0)
+    	jmax=-huge(0)
+    	kmax=-huge(0)
+    	imin=huge(0)
+    	jmin=huge(0)
+    	kmin=huge(0)
     		 		
 		do k=ks,ke
 			do j=js,je
