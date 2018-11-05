@@ -195,8 +195,8 @@ contains
 		
 		if (IS_MASTER) then
 			av_sq=sqrt(av_sq/nproc)
-			av_sq_sc=av_sq/(s_nb/nproc)
-		end if  
+			av_sq_sc=av_sq/(real(s_nb)/real(nproc))
+		end if 
 		
 		if (IS_MASTER) then	
 			write(*,'(A,I5,A,I5,A,ES11.4E2)') '	Block distr.: MAX = ',n_max, &
@@ -480,8 +480,14 @@ contains
 				vofb%c0(lbi:ubi,lbj:ubj,lbk:ubk) = tmp_c0(lbi:ubi,lbj:ubj,lbk:ubk)
 			
 			case(REDISTRIBUTION_BLK)
-				vofb%c(is:ie,js:je,ks:ke) = tmp_c
-				vofb%c0(is:ie,js:je,ks:ke) = tmp_c0
+				lbi=lbound(tmp_c,1)
+				lbj=lbound(tmp_c,2)
+				lbk=lbound(tmp_c,3)
+				ubi=ubound(tmp_c,1)
+				ubj=ubound(tmp_c,2)
+				ubk=ubound(tmp_c,3)
+				vofb%c(lbi:ubi,lbj:ubj,lbk:ubk) = tmp_c
+				vofb%c0(lbi:ubi,lbj:ubj,lbk:ubk) = tmp_c0
 								
 			case(REINIT_BLK)
 				vofb%c = tmp_c
@@ -2569,8 +2575,8 @@ contains
     				if (isHere) then
     				    
     				    !recv c,c0
-    				    call reAllocateArray(c_blk,is,ie,js,je,ks,ke)
-    				    call reAllocateArray(c0_blk,is,ie,js,je,ks,ke)
+    				    call reAllocateArray(c_blk,is-1,ie+1,js-1,je+1,ks-1,ke+1)
+    				    call reAllocateArray(c0_blk,is-1,ie+1,js-1,je+1,ks-1,ke+1)
     				    sizeBuff=realDP_size*(size(c_blk)+size(c0_blk))
     				    call reAllocateArray(buff,sizeBuff)
     				    
@@ -2610,12 +2616,12 @@ contains
 
 					if (isHere) then
     					!send c
-    					call reAllocateArray(c_blk,is,ie,js,je,ks,ke)
-    					call reAllocateArray(c0_blk,is,ie,js,je,ks,ke)
+    					call reAllocateArray(c_blk,is-1,ie+1,js-1,je+1,ks-1,ke+1)
+    					call reAllocateArray(c0_blk,is-1,ie+1,js-1,je+1,ks-1,ke+1)
     					do bl=1,s_nblk
     						if (vofBlocks(bl)%bn==b) then
-								c_blk=vofBlocks(bl)%c(is:ie,js:je,ks:ke)
-								c0_blk=vofBlocks(bl)%c0(is:ie,js:je,ks:ke)
+								c_blk=vofBlocks(bl)%c(is-1:ie+1,js-1:je+1,ks-1:ke+1)
+								c0_blk=vofBlocks(bl)%c0(is-1:ie+1,js-1:je+1,ks-1:ke+1)
     						end if
     					end do    	
     					
