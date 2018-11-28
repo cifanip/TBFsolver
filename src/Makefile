@@ -30,7 +30,7 @@ STACK_OPT =
 #STACK_OPT = -heap-arrays
 
 #debug
-#FLAGS = -g -check all -traceback -fpe0
+#FLAGS = -g -check all -traceback #-fpe0
 
 #optimal 
 FLAGS = -O2 -traceback
