@@ -28,70 +28,59 @@ end if
 call decomposeGrid(gMesh,mesh,mpiCTRL)
 call broadCastGlobalGrid(gMesh,mesh) 
 
+!*********************** primary fields
 !init volume fraction
-if (IS_MASTER) then
-	call fieldCTOR(gc,'c',gMesh,'cl',1,initOpt=1,nFolder=runTime%inputFold_)
-end if
-call fieldCTOR(c,'c',mesh,'cl',1,initOpt=-1)
-call decomposeField(gc,c)
+call read_file_field(gc,c,gMesh,mesh,'c',runTime%inputFold_,halo_size=1)
 
+!init velocity
+call read_file_vfield(gu,u,gMesh,mesh,'u',runTime%inputFold_,halo_size=2)
+
+!init phi
+call read_file_field(gpsi,psi,gMesh,mesh,'psi',runTime%inputFold_,halo_size=1)
+
+!*********************** derived fields
 !init smooth volume fraction
 if (IS_MASTER) then
-	call fieldCTOR(gcs,'cs',gMesh,'cl',1,initOpt=0)
+	call fieldCTOR(gcs,'cs',gMesh,'cl',halo_size=1,initOpt=0)
 end if
-call fieldCTOR(cs,'cs',mesh,'cl',1,initOpt=-1)
+call fieldCTOR(cs,'cs',mesh,'cl',halo_size=1,initOpt=-1)
 call decomposeField(gcs,cs)
 
 !init curvature
 if (IS_MASTER) then
-	call fieldCTOR(gcurv,'k',gMesh,'cl',1,initOpt=0)
+	call fieldCTOR(gcurv,'k',gMesh,'cl',halo_size=1,initOpt=0)
 end if
-call fieldCTOR(curv,'k',mesh,'cl',1,initOpt=-1)
+call fieldCTOR(curv,'k',mesh,'cl',halo_size=1,initOpt=-1)
 call decomposeField(gcurv,curv)
 
 !init pressure
 if (IS_MASTER) then
-	call fieldCTOR(gp,'p',gMesh,'cl',1,initOpt=1,nFolder=runTime%inputFold_)
+	call fieldCTOR(gp,'p',gMesh,'cl',halo_size=1,initOpt=3,nFolder=runTime%inputFold_)
+	call copyBoundary(gp,gpsi)
 end if
-call fieldCTOR(p,'p',mesh,'cl',1,initOpt=-1)
+call fieldCTOR(p,'p',mesh,'cl',halo_size=1,initOpt=-1)
 call decomposeField(gp,p)
-
-!init phi (delta pressure)
-if (IS_MASTER) then
-	call fieldCTOR(gpsi,'psi',gMesh,'cl',1,initOpt=1,nFolder=runTime%inputFold_)
-end if
-call fieldCTOR(psi,'psi',mesh,'cl',1,initOpt=-1)
-call decomposeField(gpsi,psi)
-
-!init velocity
-if (IS_MASTER) then
-	call vfieldCTOR(gu,'u',gMesh,'sx','sy','sz',2,initOpt=1,nFolder=runTime%inputFold_)
-	call initChFlowVelocity(gu,gMesh)
-end if
-call vfieldCTOR(u,'u',mesh,'sx','sy','sz',2,initOpt=-1)
-call decomposeFieldV(gu,u)
 
 !init vorticity
 if (IS_MASTER) then
-	call vfieldCTOR(gw,'w',gMesh,'cl','cl','cl',1,initOpt=0)
+	call vfieldCTOR(gw,'w',gMesh,'cl','cl','cl',halo_size=1,initOpt=0)
 end if
-call vfieldCTOR(w,'w',mesh,'cl','cl','cl',1,initOpt=-1)
+call vfieldCTOR(w,'w',mesh,'cl','cl','cl',halo_size=1,initOpt=-1)
 call decomposeFieldV(gw,w)
 
 !init surface tension force
 if (IS_MASTER) then
-	call vfieldCTOR(gst,'st',gMesh,'sx','sy','sz',1,initOpt=0)
+	call vfieldCTOR(gst,'st',gMesh,'sx','sy','sz',halo_size=1,initOpt=0)
 end if
-call vfieldCTOR(st,'st',mesh,'sx','sy','sz',1,initOpt=-1)
+call vfieldCTOR(st,'st',mesh,'sx','sy','sz',halo_size=1,initOpt=-1)
 call decomposeFieldV(gst,st)
 
 !init material properties fields
-call fieldCTOR(rho,'rho',mesh,'cl',1,initOpt=-1)
-call fieldCTOR(mu,'mu',mesh,'cl',1,initOpt=-1)
+call fieldCTOR(rho,'rho',mesh,'cl',halo_size=1,initOpt=-1)
+call fieldCTOR(mu,'mu',mesh,'cl',halo_size=1,initOpt=-1)
 call copyBoundary(rho,cs)
 call copyBoundary(mu,cs)
 
 if (IS_MASTER) then
 	write(*,'(A)') 'END BUILD MESH AND FIELDS'
 end if
-
