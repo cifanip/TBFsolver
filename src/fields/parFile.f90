@@ -36,6 +36,7 @@ module parFileMod
 		module PROCEDURE readParInt
 		module PROCEDURE readParBool
 		module PROCEDURE readParReal
+		module PROCEDURE readParString
 	end interface
 	
 	private :: frstnb
@@ -178,6 +179,51 @@ contains
 							if (whole(1:i1-1) == name) then
 								i2 = frstnb(whole(i1+1:),name)
 								read(whole(i1+i2:),s_doubleFormat) x
+								exit
+							end if
+					end if
+			end do
+			close(s_IOunitNumber)
+		
+		end if
+
+		if (opt_bcast) then
+			call MPI_BCAST(x, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)
+		end if
+	
+	end subroutine
+!========================================================================================!
+
+!========================================================================================!
+	subroutine readParString(this,x,name,bcast) 
+		type(parFile), intent(in) :: this
+		character(len=100), intent(out) :: x
+		character(len=*), intent(in) :: name
+		logical, intent(in), optional :: bcast
+		logical :: opt_bcast
+		character(len=100) :: whole
+		integer :: i1, i2, ios, ierror 
+		
+		if (present(bcast)) then
+			opt_bcast = bcast
+		else
+			opt_bcast = .TRUE.
+		end if
+		
+		if (IS_MASTER) then
+		
+			open(UNIT=s_IOunitNumber,FILE=this%filePath_,STATUS='OLD',ACTION='READ')
+			do 
+				read(s_IOunitNumber,s_charFormat,IOSTAT=ios) whole
+			
+					if (ios /= 0) then
+						call mpiABORT('Parameter '//name//' not found in file '//this%fileName_)
+					else
+						!parse whole
+						i1 = index(whole,' ')
+							if (whole(1:i1-1) == name) then
+								i2 = frstnb(whole(i1+1:),name)
+								read(whole(i1+i2:),s_charFormat) x
 								exit
 							end if
 					end if
