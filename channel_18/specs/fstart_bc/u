@@ -1,0 +1,82 @@
+! ************************************************************************************** !
+!    TBFsolver - DNS turbulent bubbly flow solver
+!    Copyright (C) 2018  University of Twente.
+!
+!    This program is free software: you can redistribute it and/or modify
+!    it under the terms of the GNU General Public License as published by
+!    the Free Software Foundation, either version 3 of the License, or
+!    (at your option) any later version.
+!
+!    This program is distributed in the hope that it will be useful,
+!    but WITHOUT ANY WARRANTY; without even the implied warranty of
+!    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!    GNU General Public License for more details.
+!
+!    You should have received a copy of the GNU General Public License
+!    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+! ************************************************************************************** !
+
+gridx_type sx
+gridy_type sy
+gridz_type sz
+halo_size 2
+
+!initial field: 
+!	init_opt:	1 --> init field = ivx,ivy,ivz
+!				2 --> read init field from file
+init_opt 2
+ivx 0.d0
+ivy 0.d0
+ivz 0.d0
+
+!b.c.:	1 --> fixedValue
+!		2 --> normalGradient
+!		3 --> periodicBC
+
+!boundary ordering: left,right,bottom,top,back,front
+
+! ------- ux
+bx1 3
+bx2 3
+bx3 1
+bx4 1
+bx5 3
+bx6 3
+
+bvx1 0.d0
+bvx2 0.d0
+bvx3 0.d0
+bvx4 0.d0
+bvx5 0.d0
+bvx6 0.d0
+
+! ------- uy
+by1 3
+by2 3
+by3 1
+by4 1
+by5 3
+by6 3
+
+bvy1 0.d0
+bvy2 0.d0
+bvy3 0.d0
+bvy4 0.d0
+bvy5 0.d0
+bvy6 0.d0
+
+! ------- uz
+bz1 3
+bz2 3
+bz3 1
+bz4 1
+bz5 3
+bz6 3
+
+bvz1 0.d0
+bvz2 0.d0
+bvz3 0.d0
+bvz4 0.d0
+bvz5 0.d0
+bvz6 0.d0
+
