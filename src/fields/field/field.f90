@@ -115,6 +115,8 @@ module fieldMod
 	public :: reconstructAndWriteField
 #endif		
 	public :: copyBoundary
+	public :: allocateOldField
+	public :: storeOldField
 
 #ifdef MG_MODE	
 	interface restrictField
@@ -1443,6 +1445,47 @@ INCLUDE 'boundaryField_S.f90'
         end if
 	
 	end subroutine
+!========================================================================================!
+
+!========================================================================================!
+    recursive subroutine allocateOldField(q,n)
+		type(field), intent(inout) :: q
+		integer, intent(in) :: n
+		integer :: lbi,ubi,lbj,ubj,lbk,ubk
+
+		lbi=lbound(q%f_,1)
+		ubi=ubound(q%f_,1)
+		lbj=lbound(q%f_,2)
+		ubj=ubound(q%f_,2)
+		lbk=lbound(q%f_,3)
+		ubk=ubound(q%f_,3)
+
+		if (n>0) then
+			call allocatePtrf(q)
+			call allocateArray(q%ptrf_%f_,lbi,ubi,lbj,ubj,lbk,ubk)
+			q%ptrf_%f_=q%f_
+			call allocateOldField(q%ptrf_,n-1)
+		else
+			return
+		end if
+        
+    end subroutine
+
+!========================================================================================!
+    recursive subroutine storeOldField(q,n)
+		type(field), intent(inout) :: q
+		integer, intent(in) :: n
+
+		if (n>0) then
+			if (associated(q%ptrf_)) then
+				call storeOldField(q%ptrf_,n-1)
+			end if
+			call assign_omp(q%ptrf_%f_,q%f_)
+		else
+			return
+		end if
+        
+    end subroutine
 !========================================================================================!
 
 !========================================================================================!
