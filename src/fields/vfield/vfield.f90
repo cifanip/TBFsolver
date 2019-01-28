@@ -46,30 +46,39 @@ module vfieldMod
 contains
 
 !========================================================================================!
-	subroutine vfieldCTOR(this,fileName,mesh,tpx,tpy,tpz,hd,initOpt,nFolder)
-		class(vfield), intent(out) :: this
+    subroutine read_file_vfield(gf,lf,gmesh,mesh,fname,nFolder,halo_size)
+    	type(vfield), intent(inout) :: gf
+    	type(vfield), intent(inout) :: lf
+    	type(grid), intent(in),target :: gmesh,mesh
+    	character(len=*), intent(in) :: fname
+    	integer, intent(in) :: nFolder,halo_size
+    	
+    	gf%ptrMesh_ => gmesh
+    	lf%ptrMesh_ => mesh
+		
+		call read_file_field(gf%ux_,lf%ux_,gmesh,mesh,fname,nFolder,halo_size,1)
+		call read_file_field(gf%uy_,lf%uy_,gmesh,mesh,fname,nFolder,halo_size,2)
+		call read_file_field(gf%uz_,lf%uz_,gmesh,mesh,fname,nFolder,halo_size,3)
+    		
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
+	subroutine vfieldCTOR(this,fileName,mesh,tpx,tpy,tpz,halo_size,initOpt,nFolder)
+		type(vfield), intent(inout) :: this
 		type(grid), intent(in), target :: mesh
 		character(len=*), intent(in) :: fileName
 		character(len=*), intent(in) :: tpx, tpy, tpz
-		integer, intent(in) :: hd
+		integer, intent(in) :: halo_size
 		integer, intent(in) :: initOpt
 		integer, intent(in), optional :: nFolder
-		integer :: opt_nFolder
 		
 		this%ptrMesh_ => mesh
-		
-		!optional arguments
-		if (present(nFolder)) then
-			opt_nFolder = nFolder
-		else
-			opt_nFolder = 0
-		end if
 
-		call fieldCTOR(this%ux_,fileName//'x',mesh,tpx,hd,initOpt,opt_nFolder)
-		call fieldCTOR(this%uy_,fileName//'y',mesh,tpy,hd,initOpt,opt_nFolder)
-		call fieldCTOR(this%uz_,fileName//'z',mesh,tpz,hd,initOpt,opt_nFolder)
-		
-		
+		call fieldCTOR(this%ux_,fileName//'x',mesh,tpx,halo_size,initOpt,nFolder)
+		call fieldCTOR(this%uy_,fileName//'y',mesh,tpy,halo_size,initOpt,nFolder)
+		call fieldCTOR(this%uz_,fileName//'z',mesh,tpz,halo_size,initOpt,nFolder)
+			
 	end subroutine
 !========================================================================================!
 
