@@ -88,6 +88,8 @@ module fieldMod
 	private :: readField
 	private :: readInternalField
 	private :: readDefaultField
+	private :: read_bc
+	private :: initToValue
 	private :: updateHalo
 	private :: buildHaloExchangeTypes
 	private :: decomposeInternalfield 
@@ -102,6 +104,7 @@ module fieldMod
 	private :: setIndexesBounds
 	private :: writeField
 	
+	public :: read_file_field
 	public :: fieldCTOR
 	public :: delete_field
 	public :: allocatePtrf
@@ -152,24 +155,90 @@ INCLUDE 'boundaryField_S.f90'
 !========================================================================================!
 
 !========================================================================================!
-	subroutine fieldCTOR(this,fileName,mesh,fType,hd,initOpt,nFolder)
-		type(field), intent(out) :: this
+    subroutine read_file_field(gf,lf,gmesh,mesh,fname,nFolder,halo_size,dir)
+    	type(field), intent(inout) :: gf
+    	type(field), intent(inout) :: lf
+    	type(grid), intent(in) :: gmesh,mesh
+    	character(len=*), intent(in) :: fname
+    	integer, intent(in) :: nFolder,halo_size
+    	integer, intent(in), optional :: dir
+    	character(len=100) :: grid_type
+    	type(parFile) :: pfile
+		integer :: hd,i,opt_dir,init_opt
+		real(DP) :: iv
+		integer, dimension(6) :: bt
+		real(DP), dimension(6) :: bv
+		character(len=1) :: str_bt
+		character(len=:), allocatable :: str_dir
+		
+		if (present(dir)) then
+			opt_dir=dir
+		else
+			opt_dir=0
+		end if
+		
+		select case(opt_dir)
+			case(1)
+				call allocateArray(str_dir,1)
+				str_dir='x'
+			case(2)
+				call allocateArray(str_dir,1)
+				str_dir='y'
+			case(3)
+				call allocateArray(str_dir,1)
+				str_dir='z'
+			case default
+				call allocateArray(str_dir,0)
+		end select
+    	
+    	call parFileCTOR(pfile,fname,'specs/fstart_bc')
+    	call readParameter(pfile,grid_type,'grid'//str_dir//'_type')
+    	call readParameter(pfile,init_opt,'init_opt')
+    	
+    	if ((init_opt<1).OR.(init_opt>2)) then
+    		call mpiABORT('Invalid init_opt ')
+    	end if
+    	
+    	!read i.c.
+    	call readParameter(pfile,iv,'iv'//str_dir)
+    	!read b.c.
+    	bv=0.d0
+    	do i=1,6
+    		write(str_bt,'(I1)') i
+    		call readParameter(pfile,bt(i),'b'//str_dir//str_bt)
+    		if (bt(i)<=2) then
+    			call readParameter(pfile,bv(i),'bv'//str_dir//str_bt)
+    		end if
+    	end do
+		
+		if (IS_MASTER) then
+    		call fieldCTOR(gf,fname//str_dir,gmesh,grid_type(1:2),halo_size,&
+    				       init_opt,nFolder,iv,bt,bv)
+    	end if
+		call fieldCTOR(lf,fname//str_dir,mesh,grid_type(1:2),halo_size,initOpt=-1)
+		call decomposeField(gf,lf)
+    		
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
+	subroutine fieldCTOR(this,fileName,mesh,fType,halo_size,initOpt,nFolder,iv,bt,bv)
+		type(field), intent(inout) :: this
 		type(grid), intent(in), target :: mesh
 		character(len=*), intent(in) :: fileName
 		character(len=2), intent(in) :: fType
-		integer, intent(in) :: hd
+		integer, intent(in) :: halo_size
 		integer, intent(in) :: initOpt
 		integer, intent(in), optional :: nFolder
+		real(DP), intent(in), optional :: iv
+		integer, dimension(6), intent(in), optional :: bt
+		real(DP), dimension(6), intent(in), optional :: bv
+		real(DP) :: opt_iv
+		integer, dimension(6) :: opt_bt
+		real(DP), dimension(6) :: opt_bv
 		integer :: opt_nFolder
 		type(mpiControl), pointer :: ptrMPIC
 		integer :: nx, ny, nz
-		
-		!optional argument
-		if (present(nFolder)) then
-			opt_nFolder = nFolder
-		else
-			opt_nFolder = 0
-		end if
 		
 		this%fileName_ = fileName
 		this%filePath_ = s_fileDir//'/'//fileName
@@ -188,19 +257,19 @@ INCLUDE 'boundaryField_S.f90'
 		!field type 
 		this%tp_ = fType
 		
-		!halo dimension
-		this%hd_ = hd
+		!halo size
+		this%hd_ = halo_size
 		
-		if (hd > mesh%hd_) then
+		if (halo_size > mesh%hd_) then
 			call mpiABORT('Attempt to assign halo larger than the mesh halo ')
 		end if
 
 		!indexes 
 		call setIndexesBounds(this,this%tp_)
 
-		call allocateArray(this%f_,this%is_-hd,this%ie_+hd,	&
-						   this%js_-hd,this%je_+hd,			&
-						   this%ks_-hd,this%ke_+hd)
+		call allocateArray(this%f_,this%is_-halo_size,this%ie_+halo_size,	&
+						   this%js_-halo_size,this%je_+halo_size,			&
+						   this%ks_-halo_size,this%ke_+halo_size)
 
 		!init options
 		SELECT CASE (initOpt)
@@ -213,9 +282,16 @@ INCLUDE 'boundaryField_S.f90'
 				!default zero-grad BC
 				call readDefaultField(this)
    			CASE (1)
-				!init to 0 whole field (halo included)
-				call initToZero(this)
+				!init to iv whole field (halo included)
+				call initToValue(this,iv)
+				!read boundary patches
+				call read_bc(this,bt,bv)
+   			CASE (2)
 				!read internal field + boundary patches
+				call readField(this,nFolder)
+				call read_bc(this,bt,bv)
+   			CASE (3)
+				!read internal field only
 				call readField(this,nFolder)
    			CASE DEFAULT
    				call mpiABORT('Invalid init field option ')
@@ -237,20 +313,30 @@ INCLUDE 'boundaryField_S.f90'
         
         !read internal field
 		call readInternalField(this)
-
-		!read boundaries
-		call boundaryFieldCTOR(this%bLeft_,this,1,.TRUE.)
-		call boundaryFieldCTOR(this%bRight_,this,2,.TRUE.)
-		call boundaryFieldCTOR(this%bBottom_,this,3,.TRUE.)
-		call boundaryFieldCTOR(this%bTop_,this,4,.TRUE.)
-		call boundaryFieldCTOR(this%bBack_,this,5,.TRUE.)
-		call boundaryFieldCTOR(this%bFront_,this,6,.TRUE.)
-		
-		!consistency check periodic patches - wrap around option
-		call checkPeriodicWrap(this)
 		
 		close(s_IOunitNumber)
         
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
+    subroutine read_bc(this,bt,bv)
+        type(field), intent(inout) :: this
+		integer, dimension(6), intent(in) :: bt
+		real(DP), dimension(6), intent(in) :: bv
+        character(len=10) :: dirName
+
+		!read boundaries
+		call boundaryFieldCTOR(this%bLeft_,this,1,.TRUE.,bt(1),bv(1))
+		call boundaryFieldCTOR(this%bRight_,this,2,.TRUE.,bt(2),bv(2))
+		call boundaryFieldCTOR(this%bBottom_,this,3,.TRUE.,bt(3),bv(3))
+		call boundaryFieldCTOR(this%bTop_,this,4,.TRUE.,bt(4),bv(4))
+		call boundaryFieldCTOR(this%bBack_,this,5,.TRUE.,bt(5),bv(5))
+		call boundaryFieldCTOR(this%bFront_,this,6,.TRUE.,bt(6),bv(6))
+		
+		!consistency check periodic patches - wrap around option
+		call checkPeriodicWrap(this)
+
     end subroutine
 !========================================================================================!
 
@@ -356,14 +442,6 @@ INCLUDE 'boundaryField_S.f90'
         		
         		write(s_IOunitNumber) tmp
 			
-				!write boundary field
-				call writeBoundaryField(this%bLeft_)
-				call writeBoundaryField(this%bRight_)
-				call writeBoundaryField(this%bBottom_)
-				call writeBoundaryField(this%bTop_)
-				call writeBoundaryField(this%bBack_)
-				call writeBoundaryField(this%bFront_)
-			
 			close(unit=s_IOunitNumber,iostat=ios,STATUS='KEEP')
 		
 		end if
@@ -377,6 +455,16 @@ INCLUDE 'boundaryField_S.f90'
         type(field), intent(inout) :: this
         
         call set2zero_omp(this%f_)
+        
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
+    subroutine initToValue(this,val)
+        type(field), intent(inout) :: this
+        real(DP), intent(in) :: val
+        
+        this%f_=val
         
     end subroutine
 !========================================================================================!
