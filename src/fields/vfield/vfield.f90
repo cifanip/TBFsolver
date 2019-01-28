@@ -40,6 +40,8 @@ module vfieldMod
 	public :: reconstructAndWriteFieldV
 	public :: updateBoundariesV
 	public :: copyBoundaryV
+	public :: allocateOldFieldV
+	public :: storeOldFieldV
 	
 contains
 
@@ -188,6 +190,30 @@ contains
 		call copyBoundary(cpf%uz_,f%uz_)
 		
 		
+	end subroutine
+!========================================================================================!
+
+!========================================================================================!
+	subroutine allocateOldFieldV(vf,n)
+		type(vfield), intent(inout) :: vf
+		integer, intent(in) :: n
+
+		call allocateOldField(vf%ux_,n)
+		call allocateOldField(vf%uy_,n)
+		call allocateOldField(vf%uz_,n)
+
+	end subroutine
+!========================================================================================!
+
+!========================================================================================!
+	subroutine storeOldFieldV(vf,n)
+		type(vfield), intent(inout) :: vf
+		integer, intent(in) :: n
+
+		call storeOldField(vf%ux_,n)
+		call storeOldField(vf%uy_,n)
+		call storeOldField(vf%uz_,n)
+
 	end subroutine
 !========================================================================================!
 
