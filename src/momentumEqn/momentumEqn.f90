@@ -95,10 +95,10 @@ contains
 
 
 !========================================================================================!
-	subroutine momentumEqnCTOR(this,gMesh,mesh,u,rt)
+	subroutine momentumEqnCTOR(this,gMesh,mesh,gu,u,rt)
 		type(momentumEqn) :: this
 		type(grid), intent(in), target :: gMesh,mesh
-        type(vfield), intent(in) :: u
+        type(vfield), intent(in) :: gu,u
         type(time), intent(in), target :: rt
         type(parFile) :: pfile_conv, pfile_flow, pfile_g
         logical :: read_fr
@@ -152,7 +152,7 @@ contains
         call readParameter(pfile_g,this%gCH_,'gCH')
         
         !init u0 if AB2
-        call initOldTimeFlux(this,gMesh,mesh,rt)
+        call initOldTimeFlux(this,gMesh,mesh,gu,rt)
 					    
 	end subroutine
 !========================================================================================!
@@ -1218,14 +1218,16 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-    subroutine initOldTimeFlux(this,gMesh,mesh,rt)
+    subroutine initOldTimeFlux(this,gMesh,mesh,gu,rt)
     	type(momentumEqn), intent(inout) :: this
     	type(grid), intent(in) :: gMesh,mesh
+    	type(vfield), intent(in) :: gu
     	type(time), intent(in) :: rt
 
 		if ((IS_MASTER) .AND. (rt%scheme_==s_AB2)) then
-			call vfieldCTOR(gPhi0,'phi0',gMesh,'sx','sy','sz',1,initOpt=1,&
-								 nFolder=rt%inputFold_)
+			call vfieldCTOR(gPhi0,'phi0',gMesh,'sx','sy','sz',1,initOpt=3,&
+						    nFolder=rt%inputFold_)
+			call copyBoundaryV(gPhi0,gu)
 		end if
 		
 		!decompose fluxes
