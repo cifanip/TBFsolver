@@ -17,14 +17,16 @@
 ! ************************************************************************************** !
 
 !========================================================================================!
-	subroutine boundaryFieldCTOR(this,f,bNumber,readBC)
+	subroutine boundaryFieldCTOR(this,f,bNumber,readBC,bType,bValue)
 		type(boundaryField) :: this
 		type(field), intent(in) :: f
 		integer, intent(in) :: bNumber
 		logical, intent(in) :: readBC
+		integer, intent(in), optional :: bType
+		real(DP), intent(in), optional :: bValue
 
 		if (readBC) then
-			call readBoundaryField(this,f,bNumber)
+			call readBoundaryField(this,f,bNumber,bType,bValue)
 		else
 			call initDeafaultBoundaryField(this,f,bNumber)
 		end if
@@ -103,40 +105,31 @@
 !========================================================================================!
 
 !========================================================================================!
-    subroutine readBoundaryField(this,f,bNumber)
+    subroutine readBoundaryField(this,f,bNumber,bType,bValue)
         type(boundaryField), intent(inout) :: this
         type(field), intent(in) :: f
-        integer, intent(in) :: bNumber
-        integer :: bType, bn
-        	
-        	!read boundary number
-			read(s_IOunitNumber) bn
-
-			if (bn /= bNumber) then
-				call mpiABORT('Invalid boundary number for field '//f%fileName_)
-			end if
+        integer, intent(in) :: bNumber,bType
+        real(DP), intent(in) :: bValue
+        integer :: bn
 			
-			!read boundary type
-			read(s_IOunitNumber) bType
+		if ( (bType == s_fixedValue)     &
+			 .OR. 					  	 &
+			 (bType == s_normalGradient) &
+			 .OR.						 &
+			 (bType == s_periodicBC) 	 &
+			 .OR.						 &
+			 (bType == s_calculatedBC) 	 &
+			 .OR.						 &
+			 (bType == s_contactAngleBC) &
+		   ) then
+		   call initBoundary(this,f,bNumber,bType)
+		   call initField(this,f,bValue)
+		else			
+			call mpiABORT('Invalid boundary type for field '//f%fileName_)
+		end if
 			
-			if ( (bType == s_fixedValue)     &
-				 .OR. 					  	 &
-				 (bType == s_normalGradient) &
-				 .OR.						 &
-				 (bType == s_periodicBC) 	 &
-				 .OR.						 &
-				 (bType == s_calculatedBC) 	 &
-				 .OR.						 &
-				 (bType == s_contactAngleBC) &
-			   ) then
-			   call initBoundary(this,f,bNumber,bType)
-			   call initField(this,f)
-			else			
-				call mpiABORT('Invalid boundary type for field '//f%fileName_)
-			end if
-			
-			!set metrics
-			call setMetrics(this,f%ptrMesh_	,f%tp_)
+		!set metrics
+		call setMetrics(this,f%ptrMesh_	,f%tp_)
 			        
     end subroutine
 !========================================================================================!
@@ -287,9 +280,10 @@
 !========================================================================================!
 
 !========================================================================================!
-    subroutine initField(this,f)
+    subroutine initField(this,f,bValue)
         type(boundaryField), intent(inout) :: this
         type(field), intent(in) :: f
+        real(DP), intent(in) :: bValue
         type(mpiControl), pointer :: ptrMPIC
         logical, dimension(3) :: wrap
 
@@ -297,7 +291,7 @@
 		!init field
 		SELECT CASE (this%bType_)
    		CASE (s_fixedValue,s_normalGradient,s_calculatedBC,s_contactAngleBC) 
-			call initBoundaryValues(this)
+			call initBoundaryValues(this,bValue)
 		CASE (s_periodicBC) 
 			ptrMPIC => f%ptrMesh_%ptrMPIC_
 			wrap = ptrMPIC%wrapAround_
@@ -310,15 +304,13 @@
 !========================================================================================!
 
 !========================================================================================!
-    subroutine initBoundaryValues(this)
+    subroutine initBoundaryValues(this,bValue)
         type(boundaryField), intent(inout) :: this
-        real(DP) :: x
+        real(DP), intent(in) :: bValue
         	
-		!init boundary field
-		read(s_IOunitNumber) x
-		this%bf_ = x
-			
-			        
+		!init boundary value
+		this%bf_ = bValue
+				        
     end subroutine
 !========================================================================================!
 
@@ -330,7 +322,6 @@
         character(len=2) :: str
         
         !default value (set to zero)
-        read(s_IOunitNumber) x
 		this%bf_ = 0.d0
 		
 		!check consistency with decomposeDict
@@ -593,9 +584,7 @@
    		CASE (s_contactAngleBC)
    			call updateContanctAngleBoundary(this,f)
    		CASE DEFAULT
-		END SELECT
-
-   			
+		END SELECT		
         	        
     end subroutine
 !========================================================================================!
