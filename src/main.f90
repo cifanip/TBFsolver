@@ -128,7 +128,7 @@ contains
 		call readParameter(file_fsolver,flow_solver,'flow_solver')
 	
 		call vofCTOR(vofS,gmesh,mesh,runTime,flow_solver)
-		call momentumEqnCTOR(uEqn,gMesh,mesh,u,runTime)
+		call momentumEqnCTOR(uEqn,gMesh,mesh,gu,u,runTime)
 #ifdef FAST_MODE
 		call poissonEqnCTOR(pEqn,mesh,gMesh,psi,runTime,vofS%rhol_,vofS%rhog_)
 #endif
@@ -231,6 +231,10 @@ contains
 		
 		call info_run_cpu_time()
 		
+		
+		!*********
+		call mpiAbort('APPOSTO')
+		!*********
 	end do
 
     	
