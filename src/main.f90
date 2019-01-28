@@ -230,11 +230,7 @@ contains
 		t_E = MPI_Wtime()
 		
 		call info_run_cpu_time()
-		
-		
-		!*********
-		call mpiAbort('APPOSTO')
-		!*********
+
 	end do
 
     	
