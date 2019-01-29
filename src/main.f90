@@ -31,10 +31,10 @@ PROGRAM main
 	type(mpiControl) :: mpiCTRL
 	type(time) :: runTime
 	type(grid) :: gMesh, mesh
-	type(field) :: gp, p, gpsi, psi
+	type(field) :: gpsi, psi
 	type(field) :: gc, c, gcs, cs, gcurv, curv
 	type(field) :: rho, mu
-	type(vfield) :: gU, U, gW, w, gST, st
+	type(vfield) :: gU, U, gW, w
 	type(momentumEqn) :: uEqn
 	type(poissonEqn) :: pEqn
 	type(VOF) :: vofS
@@ -130,10 +130,10 @@ contains
 		call vofCTOR(vofS,gmesh,mesh,runTime,flow_solver)
 		call momentumEqnCTOR(uEqn,gMesh,mesh,gu,u,runTime)
 #ifdef FAST_MODE
-		call poissonEqnCTOR(pEqn,mesh,gMesh,psi,runTime,vofS%rhol_,vofS%rhog_)
+		call poissonEqnCTOR(pEqn,mesh,gMesh,gpsi,psi,runTime,vofS%rhol_,vofS%rhog_)
 #endif
 #ifdef MG_MODE
-		call poissonEqnCTOR(pEqn,mesh,cs,psi,runTime)
+		call poissonEqnCTOR(pEqn,mesh,gMesh,cs,gpsi,psi,runTime,vofS%rhol_,vofS%rhog_)
 #endif
 
 		!build ramps
@@ -191,14 +191,14 @@ contains
 							  uEqn%gCH_,uEqn%fs_)
 
 			!solve momentum equation
-			call solveMomentumEqn(uEqn,u,p,mu,rho,st,c)
+			call solveMomentumEqn(uEqn,u,p,mu,rho,pEqn%rho0_,st,c)
 
 			!solve poisson equation
-			call solvePoissonEqn(pEqn,psi,rho,u)	
+			call solvePoissonEqn(pEqn,psi,rho,u,st)	
 			
 			!divergence free velocity			
 #ifdef FAST_MODE
-			call makeVelocityDivFree(uEqn,u,psi,rho,pEqn%rho0_,pEqn%nl_)
+			call makeVelocityDivFree(uEqn,u,st,psi,rho,pEqn%rho0_,pEqn%nl_)
 #endif
 #ifdef MG_MODE
 			call makeVelocityDivFree(uEqn,u,psi,rho)
@@ -211,13 +211,8 @@ contains
 			!print out continuity error
     		call computeContinuityError(u,runTime%dt_)
 			
-			!correct pressure
-#ifdef FAST_MODE
-			call updatePressure(pEqn,p,psi)
-#endif
-#ifdef MG_MODE
-			call updatePressure(p,psi)
-#endif
+			!update pressure
+			call updatePressure(pEqn,psi,p,p0,st,st0)
 			
 		end do	
 
@@ -256,14 +251,14 @@ contains
 							  uEqn%gCH_,uEqn%fs_)
 
 			!solve momentum equation
-			call solveMomentumEqn(uEqn,u,p,mu,rho,st,c)
+			call solveMomentumEqn(uEqn,u,p,mu,rho,pEqn%rho0_,st,c)
 
 			!solve poisson equation
-			call solvePoissonEqn(pEqn,psi,rho,u)	
+			call solvePoissonEqn(pEqn,psi,rho,u,st)	
 			
 			!divergence free velocity			
 #ifdef FAST_MODE
-			call makeVelocityDivFree(uEqn,u,psi,rho,pEqn%rho0_,pEqn%nl_)
+			call makeVelocityDivFree(uEqn,u,st,psi,rho,pEqn%rho0_,pEqn%nl_)
 #endif
 #ifdef MG_MODE
 			call makeVelocityDivFree(uEqn,u,psi,rho)
@@ -276,13 +271,8 @@ contains
 			!print out continuity error
     		call computeContinuityError(u,runTime%dt_)
 			
-			!correct pressure
-#ifdef FAST_MODE
-			call updatePressure(pEqn,p,psi)
-#endif
-#ifdef MG_MODE
-			call updatePressure(p,psi)
-#endif
+			!update pressure
+			call updatePressure(pEqn,psi,p,p0,st,st0)
 			
 		end do	
 
