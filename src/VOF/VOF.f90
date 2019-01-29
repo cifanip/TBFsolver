@@ -64,6 +64,7 @@ module vofMOD
 	private :: smoothVF
 	private :: cnh
 	private :: cnp
+	private :: cn0
 	private :: storeOldVOField
 	private :: compute_total_vf
 	private :: compute_blk_vf
@@ -233,7 +234,7 @@ contains
         type(field), intent(inout) :: cs
         integer :: smooth_level
         
-        smooth_level=0
+        smooth_level=1
         
         !step 1
         call cellToVertex(c%f_,s_cv,							        &	
@@ -359,6 +360,15 @@ contains
 !========================================================================================!
 
 !========================================================================================!
+    subroutine cn0(vofb)
+    	type(vofBlock), intent(inout) :: vofb
+		
+		vofb%c0=vofb%c
+
+    end subroutine
+!========================================================================================!
+
+!========================================================================================!
     subroutine solveVOF(this,c,u)
     	type(VOF), intent(inout) :: this
     	type(field), intent(inout) :: c
@@ -400,8 +410,7 @@ contains
 		
 			call explicitIntegrator(this,vofBlocks(b))	
 			call resetSatellites(vofBlocks(b))
-			!compute c^{n=1/2}
-			call cnh(vofBlocks(b))	
+			call cn0(vofBlocks(b))
 			call updateBlock(this%mesh_,this%gmesh_,vofBlocks(b),b)
 			call updateState(this,vofBlocks(b))
 			call reconstruct(this,vofBlocks(b))
