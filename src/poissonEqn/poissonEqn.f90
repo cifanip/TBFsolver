@@ -52,14 +52,18 @@ module poissonEqnMod
 		!keep a pointer to time
 		type(time), pointer :: ptrTime_ => NULL()
 
-#ifdef FAST_MODE		
+		
 		!number of pressure levels
 		integer :: nl_
-		!reference density
+
+		!reference density (only used in FFT based solver)
 		real(DP) :: rho0_ 
-#endif
+
 
 	end type
+	
+	!pressure fields
+	type(field) :: gp, p, gp0, p0
 	
 	
 	private :: computeSource
@@ -69,8 +73,6 @@ module poissonEqnMod
 	private :: info
 #ifdef FAST_MODE
 	private :: computeOldPressDiv
-	private :: allocateOldPressure
-	private :: storeOldPressure
 #endif
 	public :: poissonEqnCTOR	
 	public :: solvePoissonEqn
@@ -83,21 +85,24 @@ contains
 
 !========================================================================================!
 #ifdef FAST_MODE
-	subroutine poissonEqnCTOR(this,mesh,gMesh,psi,rt,rhol,rhog)
+	subroutine poissonEqnCTOR(this,mesh,gMesh,gpsi,psi,rt,rhol,rhog)
 		type(poissonEqn) :: this
 		type(grid), intent(in), target :: mesh,gMesh
+		type(field), intent(in) :: gpsi
 		type(field), intent(inout) :: psi
 		type(time), intent(in), target :: rt
 		real(DP), intent(in) :: rhol,rhog
 		integer :: n_old
 #endif
 #ifdef MG_MODE
-	subroutine poissonEqnCTOR(this,mesh,c,psi,rt)
+	subroutine poissonEqnCTOR(this,mesh,gMesh,c,gpsi,psi,rt,rhol,rhog)
 		type(poissonEqn) :: this
-		type(grid), intent(in), target :: mesh
+		type(grid), intent(in), target :: mesh,gMesh
 		type(field), intent(inout) :: c
+		type(field), intent(in) :: gpsi
 		type(field), intent(inout) :: psi
 		type(time), intent(in), target :: rt
+		real(DP), intent(in) :: rhol,rhog
 #endif
 		
 		this%ptrMesh_ => mesh
@@ -109,13 +114,6 @@ contains
 		
 #ifdef FAST_MODE
 		call fastPoissonSolverCTOR(this%fftSolver_,mesh,gMesh)
-		
-		!allocate space for old time pressure
-		this%nl_=2
-		call allocateOldPressure(psi,this%nl_)
-		
-		!set reference density
-		this%rho0_=min(rhol,rhog)
 #endif		
 #ifdef MG_MODE
 		call fieldCTOR(this%beta_,'beta',mesh,'cl',psi%hd_,initOpt=-1)
@@ -123,6 +121,29 @@ contains
 
 		call pcgCTOR(this%pcgs_,mesh,psi,this%beta_)		
 #endif	
+
+		!set reference density
+		this%rho0_=min(rhol,rhog)
+
+		!init current and old pressure field
+		if (IS_MASTER) then
+			call fieldCTOR(gp,'p',gMesh,'cl',halo_size=1,initOpt=4,nFolder=rt%inputFold_)
+			call copyBoundary(gp,gpsi,build_htypes=.FALSE.)
+		end if
+		call fieldCTOR(p,'p',mesh,'cl',halo_size=1,initOpt=-1)
+		call decomposeField(gp,p)
+		
+		if (IS_MASTER) then
+			call fieldCTOR(gp0,'p0',gMesh,'cl',halo_size=1,initOpt=4,nFolder=rt%inputFold_)
+			call copyBoundary(gp0,gpsi,build_htypes=.FALSE.)
+		end if
+		call fieldCTOR(p0,'p0',mesh,'cl',halo_size=1,initOpt=-1)
+		call decomposeField(gp0,p0)
+		
+		!allocate old pressure field
+		this%nl_=2
+		call allocateOldField(psi,this%nl_)
+		psi%ptrf_%ptrf_%f_=p0%f_
 		
 			    
 	end subroutine
@@ -168,10 +189,10 @@ contains
     end subroutine
 #endif   
 #ifdef FAST_MODE
-    subroutine computeSource(this,psi,rho,u)
+    subroutine computeSource(this,psi,rho,u,st)
         type(poissonEqn), intent(inout) :: this
         type(field), intent(in) :: psi,rho
-        type(vfield), intent(in) :: u
+        type(vfield), intent(in) :: u,st
         type(grid), pointer :: mesh
         integer :: nx, ny, nz
         integer :: i, j, k
@@ -193,7 +214,7 @@ contains
     	r = 1.d0/(alpha*dt)
         
  		!$OMP PARALLEL DO DEFAULT(none) &
-		!$OMP SHARED(this,u,mesh,psi,rho) &
+		!$OMP SHARED(this,u,mesh,psi,rho,st) &
 		!$OMP SHARED(nx,ny,nz,r,rho0) &
 		!$OMP PRIVATE(i,j,k) &
 		!$OMP PRIVATE(dx,dy,dz) &
@@ -217,7 +238,7 @@ contains
         			amz=1.d0-rho0*0.5d0*(1.d0/rho%f_(i,j,k-1)+1.d0/rho%f_(i,j,k))
         			
 					call computeOldPressDiv(dpxp,dpxm,dpyp,dpym,dpzp,dpzm,&
-										     i,j,k,psi,mesh,this%nl_)
+										     i,j,k,psi,st,mesh,this%nl_)
 					
 					dx = (apx*dpxp-amx*dpxm)/mesh%dxf_(1)
 					dy = (apy*dpyp-amy*dpym)/mesh%dyf_(j)
@@ -233,10 +254,11 @@ contains
         
     end subroutine
     
-    subroutine computeOldPressDiv(dpxp,dpxm,dpyp,dpym,dpzp,dpzm,i,j,k,psi,mesh,n)
+    subroutine computeOldPressDiv(dpxp,dpxm,dpyp,dpym,dpzp,dpzm,i,j,k,psi,st,mesh,n)
     	real(DP), intent(out) :: dpxp,dpxm,dpyp,dpym,dpzp,dpzm
     	integer, intent(in) :: i,j,k,n
     	type(field), intent(in) :: psi
+    	type(vfield), intent(in) :: st
     	type(grid), intent(in) :: mesh
     	
     	select case(n)
@@ -245,26 +267,32 @@ contains
     			dpxp=2.d0*(psi%ptrf_%f_(i+1,j,k)-psi%ptrf_%f_(i,j,k))
     			dpxp=dpxp-(psi%ptrf_%ptrf_%f_(i+1,j,k)-psi%ptrf_%ptrf_%f_(i,j,k))
     			dpxp=dpxp/mesh%dxc_(1)
+    			dpxp=dpxp-2.d0*st%ux_%ptrf_%f_(i,j,k)+st%ux_%ptrf_%ptrf_%f_(i,j,k)
     			!x-
     			dpxm=2.d0*(psi%ptrf_%f_(i,j,k)-psi%ptrf_%f_(i-1,j,k))
     			dpxm=dpxm-(psi%ptrf_%ptrf_%f_(i,j,k)-psi%ptrf_%ptrf_%f_(i-1,j,k))
     			dpxm=dpxm/mesh%dxc_(1)
+    			dpxm=dpxm-2.d0*st%ux_%ptrf_%f_(i-1,j,k)+st%ux_%ptrf_%ptrf_%f_(i-1,j,k)
     			!y+
     			dpyp=2.d0*(psi%ptrf_%f_(i,j+1,k)-psi%ptrf_%f_(i,j,k))
     			dpyp=dpyp-(psi%ptrf_%ptrf_%f_(i,j+1,k)-psi%ptrf_%ptrf_%f_(i,j,k))
-    			dpyp=dpyp/mesh%dyc_(j+1)    
+    			dpyp=dpyp/mesh%dyc_(j+1)
+    			dpyp=dpyp-2.d0*st%uy_%ptrf_%f_(i,j,k)+st%uy_%ptrf_%ptrf_%f_(i,j,k)   
     			!y-
     			dpym=2.d0*(psi%ptrf_%f_(i,j,k)-psi%ptrf_%f_(i,j-1,k))
     			dpym=dpym-(psi%ptrf_%ptrf_%f_(i,j,k)-psi%ptrf_%ptrf_%f_(i,j-1,k))
     			dpym=dpym/mesh%dyc_(j) 	
+    			dpym=dpym-2.d0*st%uy_%ptrf_%f_(i,j-1,k)+st%uy_%ptrf_%ptrf_%f_(i,j-1,k)
     			!z+
     			dpzp=2.d0*(psi%ptrf_%f_(i,j,k+1)-psi%ptrf_%f_(i,j,k))
     			dpzp=dpzp-(psi%ptrf_%ptrf_%f_(i,j,k+1)-psi%ptrf_%ptrf_%f_(i,j,k))
     			dpzp=dpzp/mesh%dzc_(1)
+    			dpzp=dpzp-2.d0*st%uz_%ptrf_%f_(i,j,k)+st%uz_%ptrf_%ptrf_%f_(i,j,k)
     			!z-
     			dpzm=2.d0*(psi%ptrf_%f_(i,j,k)-psi%ptrf_%f_(i,j,k-1))
     			dpzm=dpzm-(psi%ptrf_%ptrf_%f_(i,j,k)-psi%ptrf_%ptrf_%f_(i,j,k-1))
     			dpzm=dpzm/mesh%dzc_(1)
+    			dpzm=dpzm-2.d0*st%uz_%ptrf_%f_(i,j,k-1)+st%uz_%ptrf_%ptrf_%f_(i,j,k-1)
     		case default 					
     	end select
 
@@ -310,17 +338,17 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-    subroutine solvePoissonEqn(this,psi,rho,u)
+    subroutine solvePoissonEqn(this,psi,rho,u,st)
         type(poissonEqn), intent(inout) :: this
         type(field), intent(inout) :: psi
         type(field), intent(in) :: rho
-        type(vfield), intent(in) :: u
+        type(vfield), intent(in) :: u,st
         real(DP) :: start, finish
         
         start = MPI_Wtime()   
                    
 #ifdef FAST_MODE
-		call computeSource(this,psi,rho,u)
+		call computeSource(this,psi,rho,u,st)
 		call solveFPS(this%fftSolver_,psi,this%s_) 
 #endif
 #ifdef MG_MODE
@@ -337,16 +365,10 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-#ifdef FAST_MODE
-    subroutine updatePressure(this,p,psi)
+    subroutine updatePressure(this,psi,p,p0,st,st0)
     	type(poissonEqn), intent(in) :: this
-        type(field), intent(inout) :: psi
-#endif
-#ifdef MG_MODE
-    subroutine updatePressure(p,psi)
-        type(field), intent(in) :: psi
-#endif
-		type(field), intent(inout) :: p
+        type(field), intent(inout) :: p,psi,p0
+        type(vfield), intent(inout) :: st,st0
         integer :: nx, ny, nz
         integer :: i,j,k
         
@@ -361,23 +383,23 @@ contains
         do k = 1,nz
         	do j = 1,ny
         		do i = 1,nx
-#ifdef FAST_MODE
         			p%f_(i,j,k) = psi%f_(i,j,k) !+ p%f_(i,j,k)
-#endif
-#ifdef MG_MODE
-					p%f_(i,j,k) = psi%f_(i,j,k) !+ p%f_(i,j,k)
-#endif
         		end do
         	end do
         end do
         !$OMP END PARALLEL DO 
 
         call updateBoundaries(p)
-
-#ifdef FAST_MODE       
+  
         !store old pressure fields
-		call storeOldPressure(psi,this%nl_)
-#endif
+		call storeOldField(psi,this%nl_)
+		p0%f_=psi%ptrf_%ptrf_%f_
+		
+		!store old surface tension fields
+		call storeOldFieldV(st,this%nl_)
+		st0%ux_%f_=st%ux_%ptrf_%ptrf_%f_
+		st0%uy_%f_=st%uy_%ptrf_%ptrf_%f_
+		st0%uz_%f_=st%uz_%ptrf_%ptrf_%f_
         
     end subroutine
 !========================================================================================!
@@ -411,49 +433,6 @@ contains
 			
 	end subroutine
 !========================================================================================!
-
-!========================================================================================!
-#ifdef FAST_MODE
-    recursive subroutine allocateOldPressure(q,n)
-		type(field), intent(inout) :: q
-		integer, intent(in) :: n
-		integer :: lbi,ubi,lbj,ubj,lbk,ubk
-
-		lbi=lbound(q%f_,1)
-		ubi=ubound(q%f_,1)
-		lbj=lbound(q%f_,2)
-		ubj=ubound(q%f_,2)
-		lbk=lbound(q%f_,3)
-		ubk=ubound(q%f_,3)
-
-		if (n>0) then
-			call allocatePtrf(q)
-			call allocateArray(q%ptrf_%f_,lbi,ubi,lbj,ubj,lbk,ubk)
-			q%ptrf_%f_=q%f_
-			call allocateOldPressure(q%ptrf_,n-1)
-		else
-			return
-		end if
-        
-    end subroutine
-
-    recursive subroutine storeOldPressure(q,n)
-		type(field), intent(inout) :: q
-		integer, intent(in) :: n
-
-		if (n>0) then
-			if (associated(q%ptrf_)) then
-				call storeOldPressure(q%ptrf_,n-1)
-			end if
-			call assign_omp(q%ptrf_%f_,q%f_)
-		else
-			return
-		end if
-        
-    end subroutine
-#endif 
-!========================================================================================!
-
 
 end module poissonEqnMod
 
