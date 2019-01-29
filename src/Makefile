@@ -155,4 +155,4 @@ createFields_H.f90 writeFields_H.f90 main.f90
 endif
 
 clean : 
-	rm *.o *.mod $(EXE)
+	rm -f *.o *.mod $(EXE)
