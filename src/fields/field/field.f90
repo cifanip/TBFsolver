@@ -86,8 +86,9 @@ module fieldMod
 	
 	
 	private :: readField
+	private :: readField_if_present
 	private :: readInternalField
-	private :: readDefaultField
+	private :: readDefaultField_bc
 	private :: read_bc
 	private :: initToValue
 	private :: updateHalo
@@ -280,7 +281,7 @@ INCLUDE 'boundaryField_S.f90'
 				!init to 0 whole field (halo included)
 				call initToZero(this)
 				!default zero-grad BC
-				call readDefaultField(this)
+				call readDefaultField_bc(this)
    			CASE (1)
 				!init to iv whole field (halo included)
 				call initToValue(this,iv)
@@ -293,11 +294,37 @@ INCLUDE 'boundaryField_S.f90'
    			CASE (3)
 				!read internal field only
 				call readField(this,nFolder)
+   			CASE (4)
+				!read internal field only
+				call readField_if_present(this,nFolder,fileName)
    			CASE DEFAULT
    				call mpiABORT('Invalid init field option ')
 		END SELECT
 		
 	end subroutine
+!========================================================================================!
+
+!========================================================================================!
+    subroutine readField_if_present(this,nFolder,fname)
+    	type(field), intent(inout) :: this
+    	integer, intent(in) :: nFolder
+    	character(len=*), intent(in) :: fname
+    	logical :: is_present
+    	character(len=10) :: dirName
+    	
+    	write(dirName,s_intFormat) nFolder
+    	
+    	inquire(file=adjustl(trim(dirName)//'/'//fname),exist=is_present)
+    	
+    	if (is_present) then
+    		call readField(this,nFolder)	
+    	else
+    		call initToZero(this)
+    	end if
+    	
+    	call readDefaultField_bc(this)
+    	
+    end subroutine
 !========================================================================================!
 
 !========================================================================================!
@@ -341,7 +368,7 @@ INCLUDE 'boundaryField_S.f90'
 !========================================================================================!
 
 !========================================================================================!
-    subroutine readDefaultField(this)
+    subroutine readDefaultField_bc(this)
         type(field), intent(inout) :: this
         
 		!init default boundaries
@@ -1763,11 +1790,21 @@ INCLUDE 'boundaryField_S.f90'
 !========================================================================================!
 
 !========================================================================================!
-	subroutine copyBoundary(cpf,f)
+	subroutine copyBoundary(cpf,f,build_htypes)
 		type(field), intent(inout) :: cpf
 		type(field), intent(in) :: f
+		logical, intent(in), optional :: build_htypes
+		logical :: bht
 		
-		call buildHaloExchangeTypes(cpf)
+		if (present(build_htypes)) then
+			bht=build_htypes
+		else
+			bht=.TRUE.
+		end if
+		
+		if (bht) then
+			call buildHaloExchangeTypes(cpf)
+		end if
 		
 		cpf%bRight_ = f%bRight_
 		cpf%bLeft_ = f%bLeft_
