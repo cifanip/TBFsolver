@@ -52,6 +52,9 @@ module vofMOD
 	!vertex field
 	real(DP), allocatable, dimension(:,:,:), protected :: s_cv
 	
+	!surface tension field
+	type(vfield) :: gst, st, gst0, st0
+	
 
 	public :: vofCTOR
 	public :: updateMaterialProps
@@ -158,6 +161,29 @@ contains
 			call compute_total_vf(this,s_vf0_total)
 			
 		end if
+		
+		!init surface tension force
+		if (IS_MASTER) then
+			call vfieldCTOR(gst,'st',gMesh,'sx','sy','sz',halo_size=1,initOpt=4,&
+			nFolder=rt%inputFold_)
+		end if
+		call vfieldCTOR(st,'st',mesh,'sx','sy','sz',halo_size=1,initOpt=-1)
+		call decomposeFieldV(gst,st)
+		
+		if (IS_MASTER) then
+			call vfieldCTOR(gst0,'st0',gMesh,'sx','sy','sz',halo_size=1,initOpt=4,&
+			nFolder=rt%inputFold_)
+		end if
+		call vfieldCTOR(st0,'st0',mesh,'sx','sy','sz',halo_size=1,initOpt=-1)
+		call decomposeFieldV(gst0,st0)
+		
+		!allocate space to store old time levels
+		call allocateOldFieldV(st,2)
+		
+		!assign old surface tension field
+		st%ux_%ptrf_%ptrf_%f_=st0%ux_%f_
+		st%uy_%ptrf_%ptrf_%f_=st0%uy_%f_
+		st%uz_%ptrf_%ptrf_%f_=st0%uz_%f_
 		
     end subroutine
 !========================================================================================!
@@ -1639,9 +1665,9 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-    subroutine computeSurfaceTension(this,st,k)
+    subroutine computeSurfaceTension(this,stf,k)
     	type(VOF), intent(in) :: this
-    	type(vfield), intent(inout) :: st
+    	type(vfield), intent(inout) :: stf
     	type(field), intent(inout) :: k
     	integer :: b
     	real(DP) :: t_S, t_E
@@ -1658,7 +1684,7 @@ contains
     	end do	
     	!$OMP END PARALLEL DO	
 		
-		call boxes_2_grid_vf(this%mesh_,st,PACK_BOX_ST,UNPACK_SUM)
+		call boxes_2_grid_vf(this%mesh_,stf,PACK_BOX_ST,UNPACK_SUM)
 		
 		t_E = MPI_Wtime()
 		
