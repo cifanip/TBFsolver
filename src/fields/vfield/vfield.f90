@@ -190,14 +190,14 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-	subroutine copyBoundaryV(cpf,f)
+	subroutine copyBoundaryV(cpf,f,build_htypes)
 		type(vfield), intent(inout) :: cpf
 		type(vfield), intent(in) :: f
+		logical, intent(in), optional :: build_htypes
 		
-		call copyBoundary(cpf%ux_,f%ux_)
-		call copyBoundary(cpf%uy_,f%uy_)
-		call copyBoundary(cpf%uz_,f%uz_)
-		
+		call copyBoundary(cpf%ux_,f%ux_,build_htypes)
+		call copyBoundary(cpf%uy_,f%uy_,build_htypes)
+		call copyBoundary(cpf%uz_,f%uz_,build_htypes)	
 		
 	end subroutine
 !========================================================================================!
@@ -225,8 +225,6 @@ contains
 
 	end subroutine
 !========================================================================================!
-
-
 
 	
 end module vfieldMod
