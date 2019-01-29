@@ -23,9 +23,11 @@ call reconstructAndWriteField(c,gc,runTime%outputFold_)
 call reconstructAndWriteField(cs,gcs,runTime%outputFold_)
 call reconstructAndWriteField(curv,gcurv,runTime%outputFold_)
 call reconstructAndWriteField(p,gp,runTime%outputFold_)
+call reconstructAndWriteField(p0,gp0,runTime%outputFold_)
 call reconstructAndWriteField(psi,gpsi,runTime%outputFold_)
 call reconstructAndWriteFieldV(u,gu,runTime%outputFold_)
-!call reconstructAndWriteFieldV(st,gst,runTime%outputFold_)
+call reconstructAndWriteFieldV(st,gst,runTime%outputFold_)
+call reconstructAndWriteFieldV(st0,gst0,runTime%outputFold_)
 call reconstructAndWriteFieldV(w,gw,runTime%outputFold_)
 
 !write old time fluxes
