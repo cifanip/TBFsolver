@@ -1090,6 +1090,11 @@ contains
     end subroutine
     
     subroutine computeOldPressGrad(dpr,dpr0,i,j,k,dir,psi,st,mesh,n)
+! ************************************************************************************** !
+! This subroutine is based on the work: Analysis of a constant-coefficient pressure equation 
+! method for fast computations of two-phase flows at high density ratios, Cifani P., 
+! submitted to Journal of Computational Physics and currently being reviewed.
+! ************************************************************************************** !
     	real(DP), intent(out) :: dpr,dpr0
     	integer, intent(in) :: i,j,k,n,dir
     	type(field), intent(in) :: psi
