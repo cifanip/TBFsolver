@@ -158,10 +158,11 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-    subroutine solveMomentumEqn(this,u,p,mu,rho,st,c)
+    subroutine solveMomentumEqn(this,u,p,mu,rho,rho0,st,c)
     	type(momentumEqn), intent(inout) :: this
     	type(vfield), intent(inout) :: u
     	type(field), intent(in) :: p, mu, rho, c
+    	real(DP), intent(in) :: rho0
     	type(vfield), intent(in) :: st
     	real(DP) :: start, finish
     	
@@ -179,7 +180,7 @@ contains
 		call addConvDiff(this,u)
     	
     	!add sources
-    	call addSource(this,u,rho,st)
+    	call addSource(this,u,st,rho,rho0)
     	
     	!update boundaries
     	call updateBoundariesV(u)
@@ -870,25 +871,28 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-    subroutine addSource(this,u,rho,st)
+    subroutine addSource(this,u,st,rho,rho0)
     	type(momentumEqn), intent(in) :: this
     	type(vfield), intent(inout) :: u
-    	type(field), intent(in) :: rho
     	type(vfield), intent(in) :: st
+    	type(field), intent(in) :: rho
+    	real(DP), intent(in) :: rho0
     	type(grid), pointer :: mesh
     	real(DP) :: dt, alpha
-    	real(DP) :: invrho,r
+    	real(DP) :: invrho,invrho0,r
     	integer :: i, j, k
     	
     	dt = this%ptrTime_%dt_
     	alpha = alphaRKS(this%ptrTime_)
     	
     	mesh => rho%ptrMesh_
+    	
+    	invrho0=1.d0/rho0
 		
 		!x comp
  		!$OMP PARALLEL DO DEFAULT(none) &
 		!$OMP SHARED(this,mesh,u,rho,st) &
-		!$OMP SHARED(dt,alpha) &
+		!$OMP SHARED(dt,alpha,invrho0) &
 		!$OMP PRIVATE(i,j,k) &
 		!$OMP PRIVATE(invrho,r)	
 		do k = this%ksx_,this%kex_
@@ -896,10 +900,17 @@ contains
 				do i = this%isx_,this%iex_
 						
 					invrho = 0.5d0*(1.d0/rho%f_(i+1,j,k)+1.d0/rho%f_(i,j,k))
-					r = invrho*dt*alpha
-							
-					u%ux_%f_(i,j,k) = u%ux_%f_(i,j,k) + r*st%ux_%f_(i,j,k) + r*this%fs_ &
-									  + dt*alpha*this%gCH_
+					r = dt*alpha
+
+#ifdef MG_MODE							
+					u%ux_%f_(i,j,k) = u%ux_%f_(i,j,k) + invrho*r*st%ux_%f_(i,j,k) + &
+									  invrho*r*this%fs_ + r*this%gCH_
+#endif
+
+#ifdef FAST_MODE									  
+					u%ux_%f_(i,j,k) = u%ux_%f_(i,j,k) + invrho0*r*st%ux_%f_(i,j,k) + &
+									  invrho*r*this%fs_ + r*this%gCH_								  
+#endif								  
 							
 				end do
 			end do
@@ -909,7 +920,7 @@ contains
 		!y comp
  		!$OMP PARALLEL DO DEFAULT(none) &
 		!$OMP SHARED(this,mesh,u,rho,st) &
-		!$OMP SHARED(dt,alpha) &
+		!$OMP SHARED(dt,alpha,invrho0) &
 		!$OMP PRIVATE(i,j,k) &
 		!$OMP PRIVATE(invrho,r)
 		do k = this%ksy_,this%key_
@@ -917,10 +928,16 @@ contains
 				do i = this%isy_,this%iey_
 						
 					invrho = 0.5d0*(1.d0/rho%f_(i,j+1,k)+1.d0/rho%f_(i,j,k))
-					r = invrho*dt*alpha
-				
-					u%uy_%f_(i,j,k) = u%uy_%f_(i,j,k) + r*st%uy_%f_(i,j,k) + dt*alpha*this%g_
-							
+					r = dt*alpha
+
+#ifdef MG_MODE				
+					u%uy_%f_(i,j,k) = u%uy_%f_(i,j,k) + invrho*r*st%uy_%f_(i,j,k) + r*this%g_
+#endif
+
+#ifdef FAST_MODE
+					u%uy_%f_(i,j,k) = u%uy_%f_(i,j,k) + invrho0*r*st%uy_%f_(i,j,k) + r*this%g_
+#endif
+
 				end do
 			end do
 		end do
@@ -929,7 +946,7 @@ contains
 		!z comp
  		!$OMP PARALLEL DO DEFAULT(none) &
 		!$OMP SHARED(this,mesh,u,rho,st) &
-		!$OMP SHARED(dt,alpha) &
+		!$OMP SHARED(dt,alpha,invrho0) &
 		!$OMP PRIVATE(i,j,k) &
 		!$OMP PRIVATE(invrho,r)
 		do k = this%ksz_,this%kez_
@@ -937,9 +954,16 @@ contains
 				do i = this%isz_,this%iez_
 						
 					invrho = 0.5d0*(1.d0/rho%f_(i,j,k)+1.d0/rho%f_(i,j,k+1))
-					r = invrho*dt*alpha
-						
-					u%uz_%f_(i,j,k) = u%uz_%f_(i,j,k) + r*st%uz_%f_(i,j,k)
+					r = dt*alpha
+
+#ifdef MG_MODE							
+					u%uz_%f_(i,j,k) = u%uz_%f_(i,j,k) + invrho*r*st%uz_%f_(i,j,k)
+#endif
+
+#ifdef FAST_MODE
+					u%uz_%f_(i,j,k) = u%uz_%f_(i,j,k) + invrho0*r*st%uz_%f_(i,j,k)
+#endif
+
 							
 				end do
 			end do
@@ -972,9 +996,10 @@ contains
     
 #ifdef FAST_MODE
 
-    subroutine makeVelocityDivFree(this,u,psi,rho,rho0,nl)
+    subroutine makeVelocityDivFree(this,u,st,psi,rho,rho0,nl)
     	type(momentumEqn), intent(in) :: this
     	type(vfield), intent(inout) :: u 
+    	type(vfield), intent(in) :: st
     	type(field), intent(in) :: psi, rho
     	real(DP), intent(in) :: rho0
     	integer, intent(in) :: nl
@@ -992,7 +1017,7 @@ contains
 		!x comp
 		
  		!$OMP PARALLEL DO DEFAULT(none) &
-		!$OMP SHARED(this,mesh,u,rho,psi) &
+		!$OMP SHARED(this,mesh,u,rho,psi,st) &
 		!$OMP SHARED(r,invrho0,nl) &
 		!$OMP PRIVATE(i,j,k) &
 		!$OMP PRIVATE(invrho,dpr,dpr0)	
@@ -1002,7 +1027,7 @@ contains
 						
 					invrho = 0.5d0*(1.d0/rho%f_(i+1,j,k)+1.d0/rho%f_(i,j,k))
 							
-					call computeOldPressGrad(dpr,dpr0,i,j,k,1,psi,mesh,nl)
+					call computeOldPressGrad(dpr,dpr0,i,j,k,1,psi,st,mesh,nl)
 					
 					u%ux_%f_(i,j,k) = u%ux_%f_(i,j,k) - &
 									  r*(invrho0*dpr+(invrho-invrho0)*dpr0)					
@@ -1015,7 +1040,7 @@ contains
 		!y-comp
 		
  		!$OMP PARALLEL DO DEFAULT(none) &
-		!$OMP SHARED(this,mesh,u,rho,psi) &
+		!$OMP SHARED(this,mesh,u,rho,psi,st) &
 		!$OMP SHARED(r,invrho0,nl) &
 		!$OMP PRIVATE(i,j,k) &
 		!$OMP PRIVATE(invrho,dpr,dpr0)	
@@ -1025,7 +1050,7 @@ contains
 						
 					invrho = 0.5d0*(1.d0/rho%f_(i,j+1,k)+1.d0/rho%f_(i,j,k))
 					
-					call computeOldPressGrad(dpr,dpr0,i,j,k,2,psi,mesh,nl)	
+					call computeOldPressGrad(dpr,dpr0,i,j,k,2,psi,st,mesh,nl)	
 					
 					u%uy_%f_(i,j,k) = u%uy_%f_(i,j,k) - &
 									  r*(invrho0*dpr+(invrho-invrho0)*dpr0)	
@@ -1038,7 +1063,7 @@ contains
 		!z-comp
 		
  		!$OMP PARALLEL DO DEFAULT(none) &
-		!$OMP SHARED(this,mesh,u,rho,psi) &
+		!$OMP SHARED(this,mesh,u,rho,psi,st) &
 		!$OMP SHARED(r,invrho0,nl) &
 		!$OMP PRIVATE(i,j,k) &
 		!$OMP PRIVATE(invrho,dpr,dpr0)
@@ -1048,7 +1073,7 @@ contains
 						
 					invrho = 0.5d0*(1.d0/rho%f_(i,j,k+1)+1.d0/rho%f_(i,j,k))
 					
-					call computeOldPressGrad(dpr,dpr0,i,j,k,3,psi,mesh,nl)
+					call computeOldPressGrad(dpr,dpr0,i,j,k,3,psi,st,mesh,nl)
 							
 					u%uz_%f_(i,j,k) = u%uz_%f_(i,j,k) - &
 									  r*(invrho0*dpr+(invrho-invrho0)*dpr0)
@@ -1064,10 +1089,11 @@ contains
     	
     end subroutine
     
-    subroutine computeOldPressGrad(dpr,dpr0,i,j,k,dir,psi,mesh,n)
+    subroutine computeOldPressGrad(dpr,dpr0,i,j,k,dir,psi,st,mesh,n)
     	real(DP), intent(out) :: dpr,dpr0
     	integer, intent(in) :: i,j,k,n,dir
     	type(field), intent(in) :: psi
+    	type(vfield), intent(in) :: st
     	type(grid), intent(in) :: mesh
     	
     	select case(n)
@@ -1077,14 +1103,17 @@ contains
     				    dpr=(psi%f_(i+1,j,k)-psi%f_(i,j,k))/mesh%dxc_(1)
     					dpr0=(2.d0*(psi%ptrf_%f_(i+1,j,k)-psi%ptrf_%f_(i,j,k))-&
     					    (psi%ptrf_%ptrf_%f_(i+1,j,k)-psi%ptrf_%ptrf_%f_(i,j,k)))/mesh%dxc_(1)
+    					dpr0=dpr0-2.d0*st%ux_%ptrf_%f_(i,j,k)+st%ux_%ptrf_%ptrf_%f_(i,j,k)
     				case(2)
     				    dpr=(psi%f_(i,j+1,k)-psi%f_(i,j,k))/mesh%dyc_(j+1)
     					dpr0=(2.d0*(psi%ptrf_%f_(i,j+1,k)-psi%ptrf_%f_(i,j,k))-&
     					    (psi%ptrf_%ptrf_%f_(i,j+1,k)-psi%ptrf_%ptrf_%f_(i,j,k)))/mesh%dyc_(j+1)
+    					dpr0=dpr0-2.d0*st%uy_%ptrf_%f_(i,j,k)+st%uy_%ptrf_%ptrf_%f_(i,j,k)
     				case(3)
     				    dpr=(psi%f_(i,j,k+1)-psi%f_(i,j,k))/mesh%dzc_(1)
     					dpr0=(2.d0*(psi%ptrf_%f_(i,j,k+1)-psi%ptrf_%f_(i,j,k))-&
     					    (psi%ptrf_%ptrf_%f_(i,j,k+1)-psi%ptrf_%ptrf_%f_(i,j,k)))/mesh%dzc_(1)
+    					dpr0=dpr0-2.d0*st%uz_%ptrf_%f_(i,j,k)+st%uz_%ptrf_%ptrf_%f_(i,j,k)
     				case default
     			end select
     		case default 					
@@ -1187,12 +1216,11 @@ contains
 !========================================================================================!
     subroutine copyOldFluxes(this)
     	type(momentumEqn), intent(inout) :: this
-    	  	
+	
     	call assign_omp(this%phiPrevX_,this%phiX_)
     	call assign_omp(this%phiPrevY_,this%phiY_)
     	call assign_omp(this%phiPrevZ_,this%phiZ_)
     	    	
-		 
     end subroutine
 !========================================================================================!
 
@@ -1225,9 +1253,9 @@ contains
     	type(time), intent(in) :: rt
 
 		if ((IS_MASTER) .AND. (rt%scheme_==s_AB2)) then
-			call vfieldCTOR(gPhi0,'phi0',gMesh,'sx','sy','sz',1,initOpt=3,&
+			call vfieldCTOR(gPhi0,'phi0',gMesh,'sx','sy','sz',1,initOpt=4,&
 						    nFolder=rt%inputFold_)
-			call copyBoundaryV(gPhi0,gu)
+			call copyBoundaryV(gPhi0,gu,build_htypes=.FALSE.)
 		end if
 		
 		!decompose fluxes
@@ -1238,7 +1266,6 @@ contains
 			this%phiY_ = phi0%uy_%f_(this%isy_:this%iey_,this%jsy_:this%jey_,this%ksy_:this%key_)
 			this%phiZ_ = phi0%uz_%f_(this%isz_:this%iez_,this%jsz_:this%jez_,this%ksz_:this%kez_)
 		end if
-		
     	
     end subroutine
 !========================================================================================!
