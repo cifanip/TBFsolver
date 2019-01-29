@@ -19,7 +19,6 @@
 gridx_type sx
 gridy_type sy
 gridz_type sz
-halo_size 2
 
 !initial field: 
 !	init_opt:	1 --> init field = ivx,ivy,ivz
