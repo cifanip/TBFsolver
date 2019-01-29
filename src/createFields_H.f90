@@ -53,27 +53,12 @@ end if
 call fieldCTOR(curv,'k',mesh,'cl',halo_size=1,initOpt=-1)
 call decomposeField(gcurv,curv)
 
-!init pressure
-if (IS_MASTER) then
-	call fieldCTOR(gp,'p',gMesh,'cl',halo_size=1,initOpt=3,nFolder=runTime%inputFold_)
-	call copyBoundary(gp,gpsi)
-end if
-call fieldCTOR(p,'p',mesh,'cl',halo_size=1,initOpt=-1)
-call decomposeField(gp,p)
-
 !init vorticity
 if (IS_MASTER) then
 	call vfieldCTOR(gw,'w',gMesh,'cl','cl','cl',halo_size=1,initOpt=0)
 end if
 call vfieldCTOR(w,'w',mesh,'cl','cl','cl',halo_size=1,initOpt=-1)
 call decomposeFieldV(gw,w)
-
-!init surface tension force
-if (IS_MASTER) then
-	call vfieldCTOR(gst,'st',gMesh,'sx','sy','sz',halo_size=1,initOpt=0)
-end if
-call vfieldCTOR(st,'st',mesh,'sx','sy','sz',halo_size=1,initOpt=-1)
-call decomposeFieldV(gst,st)
 
 !init material properties fields
 call fieldCTOR(rho,'rho',mesh,'cl',halo_size=1,initOpt=-1)
