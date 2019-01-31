@@ -67,6 +67,7 @@ module poissonEqnMod
 	
 	
 	private :: computeSource
+	private :: clean_st_prev_bc
 #ifdef MG_MODE
 	private :: computeBeta
 #endif
@@ -398,15 +399,64 @@ contains
   
         !store old pressure fields
 		call storeOldField(psi,this%nl_)
-		p0%f_=psi%ptrf_%ptrf_%f_
 		
 		!store old surface tension fields
 		call storeOldFieldV(st,this%nl_)
+		
+		!clean-up b.c. old times surface tension
+		call clean_st_prev_bc(psi,st)
+		
+		!output copy
+		p0%f_=psi%ptrf_%ptrf_%f_
 		st0%ux_%f_=st%ux_%ptrf_%ptrf_%f_
 		st0%uy_%f_=st%uy_%ptrf_%ptrf_%f_
 		st0%uz_%f_=st%uz_%ptrf_%ptrf_%f_
         
     end subroutine
+!========================================================================================!
+
+!========================================================================================!
+	subroutine clean_st_prev_bc(psi,st)
+		type(field), intent(in) :: psi
+		type(vfield), intent(inout) :: st
+		integer :: lbi,ubi,lbj,ubj,lbk,ubk
+		integer :: hd
+		
+		lbi=lbound(st%ux_%f_,1)
+		ubi=ubound(st%ux_%f_,1)
+		lbj=lbound(st%uy_%f_,2)
+		ubj=ubound(st%uy_%f_,2)
+		lbk=lbound(st%uz_%f_,3)
+		ubk=ubound(st%uz_%f_,3)
+		
+		hd=st%ux_%hd_	
+		
+		if (psi%bRight_%bType_==s_normalGradient) then
+			st%ux_%ptrf_%f_(ubi-hd:ubi,:,:)=0.d0
+			st%ux_%ptrf_%ptrf_%f_(ubi-hd:ubi,:,:)=0.d0
+		end if
+		if (psi%bLeft_%bType_==s_normalGradient) then
+			st%ux_%ptrf_%f_(lbi:lbi+hd,:,:)=0.d0
+			st%ux_%ptrf_%ptrf_%f_(lbi:lbi+hd,:,:)=0.d0
+		end if
+		if (psi%bTop_%bType_==s_normalGradient) then
+			st%uy_%ptrf_%f_(:,ubj-hd:ubj,:)=0.d0
+			st%uy_%ptrf_%ptrf_%f_(:,ubj-hd:ubj,:)=0.d0
+		end if
+		if (psi%bBottom_%bType_==s_normalGradient) then
+			st%uy_%ptrf_%f_(:,lbj:lbj+hd,:)=0.d0
+			st%uy_%ptrf_%ptrf_%f_(:,lbj:lbj+hd,:)=0.d0
+		end if
+		if (psi%bFront_%bType_==s_normalGradient) then
+			st%uz_%ptrf_%f_(:,:,ubk-hd:ubk)=0.d0
+			st%uz_%ptrf_%ptrf_%f_(:,:,ubk-hd:ubk)=0.d0
+		end if
+		if (psi%bBack_%bType_==s_normalGradient) then
+			st%uz_%ptrf_%f_(:,:,lbk:lbk+hd)=0.d0
+			st%uz_%ptrf_%ptrf_%f_(:,:,lbk:lbk+hd)=0.d0
+		end if
+		
+	end subroutine
 !========================================================================================!
 
 !========================================================================================!
