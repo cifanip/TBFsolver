@@ -407,10 +407,10 @@ contains
 		call clean_st_prev_bc(psi,st)
 		
 		!output copy
-		p0%f_=psi%ptrf_%ptrf_%f_
-		st0%ux_%f_=st%ux_%ptrf_%ptrf_%f_
-		st0%uy_%f_=st%uy_%ptrf_%ptrf_%f_
-		st0%uz_%f_=st%uz_%ptrf_%ptrf_%f_
+		call assign_omp(p0%f_,psi%ptrf_%ptrf_%f_)
+		call assign_omp(st0%ux_%f_,st%ux_%ptrf_%ptrf_%f_)
+		call assign_omp(st0%uy_%f_,st%uy_%ptrf_%ptrf_%f_)
+		call assign_omp(st0%uz_%f_,st%uz_%ptrf_%ptrf_%f_)
         
     end subroutine
 !========================================================================================!
