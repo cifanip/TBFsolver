@@ -409,7 +409,7 @@ contains
 			end do
 		
 			call explicitIntegrator(this,vofBlocks(b))	
-			call resetSatellites(vofBlocks(b))
+			call resetFragments(vofBlocks(b))
 			call cn0(vofBlocks(b))
 			call updateBlock(this%mesh_,this%gmesh_,vofBlocks(b),b)
 			call updateState(this,vofBlocks(b))
