@@ -32,36 +32,47 @@ module initialConditionsMod
 contains
 
 !========================================================================================!
-    subroutine initChFlowVelocity(u,mesh)
+    subroutine initChFlowVelocity(u,mesh,gmesh)
     	type(vfield), intent(inout) :: u
-    	type(grid), intent(in) :: mesh
+    	type(grid), intent(in) :: mesh,gmesh
     	real(DP) :: Lx, Ly, Lz
-    	integer :: i, j, k
+    	integer :: i,j,k,ig,jg,kg,proc,nx,ny,nz
     	real(DP) :: x, y, z, icA, icB
     	type(parFile) :: pfile
     	logical :: found
     	
     	call parFileCTOR(pfile,'initVelocity','specs')
-    	call readParameter(pfile,found,'perturbed_parabolic',bcast=.FALSE.)
+    	call readParameter(pfile,found,'perturbed_parabolic')
     	if (found) then
-    		call readParameter(pfile,icA,'icA',bcast=.FALSE.)
+    		call readParameter(pfile,icA,'icA')
     		icB = icA/10.d0
     	else
     		return
     	end if
     	
-    	Lx = mesh%Lx_
-    	Ly = mesh%Ly_
-    	Lz = mesh%Lz_
+    	Lx = gmesh%Lx_
+    	Ly = gmesh%Ly_
+    	Lz = gmesh%Lz_
+    	
+    	nx=mesh%nx_
+    	ny=mesh%ny_
+    	nz=mesh%nz_
+    	
+    	proc=mesh%ptrMPIC_%rank_
 		
 		!ux
 		do k=u%ux_%ks_,u%ux_%ke_
 			do j=u%ux_%js_,u%ux_%je_
 				do i=u%ux_%is_,u%ux_%ie_
 					
-					x = mesh%xf_(i)
-					y = mesh%yc_(j)
-					z = mesh%zc_(k)
+					!global indexes 
+					ig = mesh%ptrMPIC_%gCoords_(1,proc)*nx+i
+					jg = mesh%ptrMPIC_%gCoords_(2,proc)*ny+j
+					kg = mesh%ptrMPIC_%gCoords_(3,proc)*nz+k	
+					
+					x = gmesh%xf_(ig)
+					y = gmesh%yc_(jg)
+					z = gmesh%zc_(kg)
 					
 					u%ux_%f_(i,j,k) = icA*y*(Ly-y) + &
 									  icB*cos(2.d0*pi*x/Lx)*sin(2.d0*pi*y/Ly)*sin(2.d0*pi*z/Lz) + &
@@ -76,9 +87,14 @@ contains
 			do j=u%uy_%js_,u%uy_%je_
 				do i=u%uz_%is_,u%uz_%ie_
 					
-					x = mesh%xc_(i)
-					y = mesh%yf_(j)
-					z = mesh%zc_(k)
+					!global indexes 
+					ig = mesh%ptrMPIC_%gCoords_(1,proc)*nx+i
+					jg = mesh%ptrMPIC_%gCoords_(2,proc)*ny+j
+					kg = mesh%ptrMPIC_%gCoords_(3,proc)*nz+k
+					
+					x = gmesh%xc_(ig)
+					y = gmesh%yf_(jg)
+					z = gmesh%zc_(kg)
 					
 					u%uy_%f_(i,j,k) = -(icB*Ly)/(2.d0*Lx)* &
 					   				  (sin(2.d0*pi*x/Lx)*(-1.d0+cos(2.d0*pi*y/Ly))*sin(2.d0*pi*z/Lz)+ &
@@ -92,10 +108,15 @@ contains
 		do k=u%uz_%ks_,u%uz_%ke_
 			do j=u%uz_%js_,u%uz_%je_
 				do i=u%uz_%is_,u%uz_%ie_
+				
+					!global indexes 
+					ig = mesh%ptrMPIC_%gCoords_(1,proc)*nx+i
+					jg = mesh%ptrMPIC_%gCoords_(2,proc)*ny+j
+					kg = mesh%ptrMPIC_%gCoords_(3,proc)*nz+k
 					
-					x = mesh%xc_(i)
-					y = mesh%yc_(j)
-					z = mesh%zf_(k)
+					x = gmesh%xc_(ig)
+					y = gmesh%yc_(jg)
+					z = gmesh%zf_(kg)
 					
 					u%uz_%f_(i,j,k) = -(icB*Lz)/(2.d0*Lx)* &
 					   				  (sin(2.d0*pi*x/Lx)*sin(2.d0*pi*y/Ly)*cos(2.d0*pi*z/Lz)+ &
@@ -105,6 +126,7 @@ contains
 			end do
 		end do
 		
+		call updateBoundariesV(u)		
         
     end subroutine
 !========================================================================================!
