@@ -34,6 +34,7 @@ call read_file_field(gc,c,gMesh,mesh,'c',runTime%inputFold_,halo_size=1)
 
 !init velocity
 call read_file_vfield(gu,u,gMesh,mesh,'u',runTime%inputFold_,halo_size=2)
+call initChFlowVelocity(u,mesh,gmesh)
 
 !init phi
 call read_file_field(gpsi,psi,gMesh,mesh,'psi',runTime%inputFold_,halo_size=1)
