@@ -17,7 +17,7 @@
 ! ************************************************************************************** !
 
 !reconstruct and write fields
-call writeTimeFolder(runTime,s_nb)
+call writeTimeFolder(runTime,s_nb,mpiCTRL)
 
 call reconstructAndWriteField(c,gc,runTime%outputFold_)
 call reconstructAndWriteField(cs,gcs,runTime%outputFold_)
