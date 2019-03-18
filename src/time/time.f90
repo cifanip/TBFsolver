@@ -304,11 +304,12 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-    subroutine writeTimeFolder(this,nb)
+    subroutine writeTimeFolder(this,nb,mpic)
         type(time), intent(inout) :: this
         integer, intent(in) :: nb
+        type(mpiControl), intent(in) :: mpic
         character(len=10) :: dirName
-        integer :: CSTAT
+        integer :: CSTAT,ierror
         
         this%outputFold_ = this%outputFold_ + 1
         
@@ -335,6 +336,8 @@ contains
 
         
         end if
+        
+        call mpi_barrier(mpic%cartComm_,ierror)
         
 
     end subroutine
