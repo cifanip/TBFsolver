@@ -323,7 +323,7 @@ contains
 		n = i0-1-gHD
 		
 		do i=lb,ub
-			q(i) = 0.5d0*Lg*(1d0 + tanh(-s_gamma+2*s_gamma*n/ncg)/tanh(s_gamma))
+			q(i) = 0.5d0*Lg*(1.d0 + tanh(-s_gamma+2.d0*s_gamma*n/ncg)/tanh(s_gamma))
 			n = n+1
 		end do
 		
