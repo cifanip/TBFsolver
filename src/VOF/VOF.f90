@@ -2372,7 +2372,7 @@ contains
     	vl = 0.d0
     	
     	s2 = sqrt(m(1)*m(1)+m(2)*m(2)+m(3)*m(3))
-    	i2=m/s2
+    	i2=m/(s2+tiny(0.d0))
     	
     	mloc = maxloc( abs(m),1 )
     	
@@ -2425,7 +2425,7 @@ contains
     		case default
 		end select
 		 	
-    	i1=i1/s1
+    	i1=i1/(s1+tiny(0.d0))
 
 		i3(1) = i1(2)*i2(3)-i1(3)*i2(2)
 		i3(2) = i1(3)*i2(1)-i1(1)*i2(3)
