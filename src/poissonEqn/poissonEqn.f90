@@ -257,9 +257,9 @@ contains
     
     subroutine computeOldPressDiv(dpxp,dpxm,dpyp,dpym,dpzp,dpzm,i,j,k,psi,st,mesh,n)
 ! ************************************************************************************** !
-! This subroutine is based on the work: Analysis of a constant-coefficient pressure equation 
-! method for fast computations of two-phase flows at high density ratios, Cifani P., 
-! submitted to Journal of Computational Physics and currently being reviewed.
+! This subroutine is based on the work: Cifani, P., 2019. Analysis of a constant-coefficient 
+! pressure equation method for fast computations of two-phase flows at high density ratios,
+! Journal of Computational Physics.
 ! ************************************************************************************** !
     	real(DP), intent(out) :: dpxp,dpxm,dpyp,dpym,dpzp,dpzm
     	integer, intent(in) :: i,j,k,n
