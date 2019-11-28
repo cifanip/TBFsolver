@@ -580,10 +580,7 @@ contains
 					ppm_(1,j) = ( ppm_(1,j)*(t-this%Ts_-dt)+sppm(1,j)*dt ) / (t-this%Ts_)				
 					uum_(:,j) = ( uum_(:,j)*(t-this%Ts_-dt)+suum(:,j)*dt ) / (t-this%Ts_)
 					wwm_(:,j) = ( wwm_(:,j)*(t-this%Ts_-dt)+swwm(:,j)*dt ) / (t-this%Ts_)
-				end do		
-				
-				write(*,*) um_(1,6),sum(1,6),t,dt,this%Ts_
-						
+				end do						
 			case(s_gas_region)
 				do j=1,nyg		
 					pmg_(1,j) = ( pmg_(1,j)*(t-this%Ts_-dt)+spm(1,j)*dt ) / (t-this%Ts_)
