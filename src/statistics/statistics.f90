@@ -227,7 +227,7 @@ contains
 		start = MPI_Wtime()  
 		
 		if (.not.this%hasTimeAvStarted_) then
-			call checkTimeAverage(this,t)
+			call checkTimeAverage(this,t,dt)
 		end if
 		
 		if (this%isTimeAverage_) then
@@ -555,7 +555,7 @@ contains
 		nyg = this%p_%ptrMesh_%nyg_
 		
 		do j=1,nyg							
-			cm_(1,j) = ( cm_(1,j)*(t-this%Ts_)+scm(1,j)*dt ) / (t-this%Ts_+dt)
+			cm_(1,j) = ( cm_(1,j)*(t-this%Ts_-dt)+scm(1,j)*dt ) / (t-this%Ts_)
 		end do
 
 	end subroutine
@@ -574,30 +574,33 @@ contains
 		select case(region)
 			case(s_whole_region)
 				do j=1,nyg
-					pm_(1,j) = ( pm_(1,j)*(t-this%Ts_)+spm(1,j)*dt ) / (t-this%Ts_+dt)
-					um_(:,j) = ( um_(:,j)*(t-this%Ts_)+sum(:,j)*dt ) / (t-this%Ts_+dt)
-					wm_(:,j) = ( wm_(:,j)*(t-this%Ts_)+swm(:,j)*dt ) / (t-this%Ts_+dt)
-					ppm_(1,j) = ( ppm_(1,j)*(t-this%Ts_)+sppm(1,j)*dt ) / (t-this%Ts_+dt)				
-					uum_(:,j) = ( uum_(:,j)*(t-this%Ts_)+suum(:,j)*dt ) / (t-this%Ts_+dt)
-					wwm_(:,j) = ( wwm_(:,j)*(t-this%Ts_)+swwm(:,j)*dt ) / (t-this%Ts_+dt)
-				end do				
+					pm_(1,j) = ( pm_(1,j)*(t-this%Ts_-dt)+spm(1,j)*dt ) / (t-this%Ts_)
+					um_(:,j) = ( um_(:,j)*(t-this%Ts_-dt)+sum(:,j)*dt ) / (t-this%Ts_)
+					wm_(:,j) = ( wm_(:,j)*(t-this%Ts_-dt)+swm(:,j)*dt ) / (t-this%Ts_)
+					ppm_(1,j) = ( ppm_(1,j)*(t-this%Ts_-dt)+sppm(1,j)*dt ) / (t-this%Ts_)				
+					uum_(:,j) = ( uum_(:,j)*(t-this%Ts_-dt)+suum(:,j)*dt ) / (t-this%Ts_)
+					wwm_(:,j) = ( wwm_(:,j)*(t-this%Ts_-dt)+swwm(:,j)*dt ) / (t-this%Ts_)
+				end do		
+				
+				write(*,*) um_(1,6),sum(1,6),t,dt,this%Ts_
+						
 			case(s_gas_region)
 				do j=1,nyg		
-					pmg_(1,j) = ( pmg_(1,j)*(t-this%Ts_)+spm(1,j)*dt ) / (t-this%Ts_+dt)
-					umg_(:,j) = ( umg_(:,j)*(t-this%Ts_)+sum(:,j)*dt ) / (t-this%Ts_+dt)
-					wmg_(:,j) = ( wmg_(:,j)*(t-this%Ts_)+swm(:,j)*dt ) / (t-this%Ts_+dt)
-					ppmg_(1,j) = ( ppmg_(1,j)*(t-this%Ts_)+sppm(1,j)*dt ) / (t-this%Ts_+dt)				
-					uumg_(:,j) = ( uumg_(:,j)*(t-this%Ts_)+suum(:,j)*dt ) / (t-this%Ts_+dt)
-					wwmg_(:,j) = ( wwmg_(:,j)*(t-this%Ts_)+swwm(:,j)*dt ) / (t-this%Ts_+dt)	
+					pmg_(1,j) = ( pmg_(1,j)*(t-this%Ts_-dt)+spm(1,j)*dt ) / (t-this%Ts_)
+					umg_(:,j) = ( umg_(:,j)*(t-this%Ts_-dt)+sum(:,j)*dt ) / (t-this%Ts_)
+					wmg_(:,j) = ( wmg_(:,j)*(t-this%Ts_-dt)+swm(:,j)*dt ) / (t-this%Ts_)
+					ppmg_(1,j) = ( ppmg_(1,j)*(t-this%Ts_-dt)+sppm(1,j)*dt ) / (t-this%Ts_)				
+					uumg_(:,j) = ( uumg_(:,j)*(t-this%Ts_-dt)+suum(:,j)*dt ) / (t-this%Ts_)
+					wwmg_(:,j) = ( wwmg_(:,j)*(t-this%Ts_-dt)+swwm(:,j)*dt ) / (t-this%Ts_)	
 				end do
 			case(s_liquid_region)
 				do j=1,nyg			
-					pml_(1,j) = ( pml_(1,j)*(t-this%Ts_)+spm(1,j)*dt ) / (t-this%Ts_+dt)
-					uml_(:,j) = ( uml_(:,j)*(t-this%Ts_)+sum(:,j)*dt ) / (t-this%Ts_+dt)
-					wml_(:,j) = ( wml_(:,j)*(t-this%Ts_)+swm(:,j)*dt ) / (t-this%Ts_+dt)
-					ppml_(1,j) = ( ppml_(1,j)*(t-this%Ts_)+sppm(1,j)*dt ) / (t-this%Ts_+dt)				
-					uuml_(:,j) = ( uuml_(:,j)*(t-this%Ts_)+suum(:,j)*dt ) / (t-this%Ts_+dt)
-					wwml_(:,j) = ( wwml_(:,j)*(t-this%Ts_)+swwm(:,j)*dt ) / (t-this%Ts_+dt)	
+					pml_(1,j) = ( pml_(1,j)*(t-this%Ts_-dt)+spm(1,j)*dt ) / (t-this%Ts_)
+					uml_(:,j) = ( uml_(:,j)*(t-this%Ts_-dt)+sum(:,j)*dt ) / (t-this%Ts_)
+					wml_(:,j) = ( wml_(:,j)*(t-this%Ts_-dt)+swm(:,j)*dt ) / (t-this%Ts_)
+					ppml_(1,j) = ( ppml_(1,j)*(t-this%Ts_-dt)+sppm(1,j)*dt ) / (t-this%Ts_)				
+					uuml_(:,j) = ( uuml_(:,j)*(t-this%Ts_-dt)+suum(:,j)*dt ) / (t-this%Ts_)
+					wwml_(:,j) = ( wwml_(:,j)*(t-this%Ts_-dt)+swwm(:,j)*dt ) / (t-this%Ts_)	
 				end do
 			case default
 		end select
@@ -618,18 +621,18 @@ contains
 		select case(region)
 			case(s_whole_region)
 				do j=1,nyg
-					dum_(:,j) = ( dum_(:,j)*(t-this%Ts_)+sdum(:,j)*dt ) / (t-this%Ts_+dt)
-					dudum_(:,j) = ( dudum_(:,j)*(t-this%Ts_)+sdudum(:,j)*dt ) / (t-this%Ts_+dt)
+					dum_(:,j) = ( dum_(:,j)*(t-this%Ts_-dt)+sdum(:,j)*dt ) / (t-this%Ts_)
+					dudum_(:,j) = ( dudum_(:,j)*(t-this%Ts_-dt)+sdudum(:,j)*dt ) / (t-this%Ts_)
 				end do				
 			case(s_gas_region)
 				do j=1,nyg		
-					dumg_(:,j) = ( dumg_(:,j)*(t-this%Ts_)+sdum(:,j)*dt ) / (t-this%Ts_+dt)
-					dudumg_(:,j) = ( dudumg_(:,j)*(t-this%Ts_)+sdudum(:,j)*dt ) / (t-this%Ts_+dt)
+					dumg_(:,j) = ( dumg_(:,j)*(t-this%Ts_-dt)+sdum(:,j)*dt ) / (t-this%Ts_)
+					dudumg_(:,j) = ( dudumg_(:,j)*(t-this%Ts_-dt)+sdudum(:,j)*dt ) / (t-this%Ts_)
 				end do
 			case(s_liquid_region)
 				do j=1,nyg			
-					duml_(:,j) = ( duml_(:,j)*(t-this%Ts_)+sdum(:,j)*dt ) / (t-this%Ts_+dt)
-					duduml_(:,j) = ( duduml_(:,j)*(t-this%Ts_)+sdudum(:,j)*dt ) / (t-this%Ts_+dt)
+					duml_(:,j) = ( duml_(:,j)*(t-this%Ts_-dt)+sdum(:,j)*dt ) / (t-this%Ts_)
+					duduml_(:,j) = ( duduml_(:,j)*(t-this%Ts_-dt)+sdudum(:,j)*dt ) / (t-this%Ts_)
 				end do
 			case default
 		end select
@@ -1164,7 +1167,7 @@ contains
 			write(*,'(A,'//s_doubleFormat(2:10)//')') '	(tau_w)_A:  ', tau_g		
 		
 			if (this%isTimeAverage_) then	
-				tauw_tav = ( tauw_tav*(t-this%Ts_)+tau_g*dt ) / (t-this%Ts_+dt)
+				tauw_tav = ( tauw_tav*(t-this%Ts_-dt)+tau_g*dt ) / (t-this%Ts_)
 				write(*,'(A,'//s_doubleFormat(2:10)//')') '	(tau_w)_A,t:', tauw_tav
 			end if
 
@@ -1174,13 +1177,17 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-    subroutine checkTimeAverage(this,t)
+    subroutine checkTimeAverage(this,t,dt)
     	type(statistics), intent(inout) :: this
-    	real(DP), intent(in) :: t
+    	real(DP), intent(in) :: t,dt
     	
     	if (t >= this%Ts_) then    	
     		this%isTimeAverage_ = .TRUE.
     		this%hasTimeAvStarted_=.TRUE.
+    		!adjust TS, except when restarting
+    		if ((t-this%Ts_).le.(2.d0*dt)) then
+    			this%Ts_=t-dt
+    		end if
 		else		
 			this%isTimeAverage_ = .FALSE.			
 		end if
