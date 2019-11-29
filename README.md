@@ -1,7 +1,7 @@
 # TBFsolver
 DNS Turbulent Bubbly Flow solver
 
-TBFsolver is a highly accurate and parallelised solver for Direct Numerical Simulation (DNS) of turbulent bubble-laden channel flow. See [P. Cifani - Highly scalable DNS solver for turbulent bubble-laden channel flow](https://www.sciencedirect.com/science/article/pii/S0045793018303311) for more details. 
+TBFsolver is a massively parallel solver for Direct Numerical Simulation (DNS) of turbulent bubble-laden channel flow. See [P. Cifani - Highly scalable DNS solver for turbulent bubble-laden channel flow](https://www.sciencedirect.com/science/article/pii/S0045793018303311) for more details. 
 
 ## COPYING
 TBFsolver is distributed under the terms of the General Public License. See the file COPYING for details. 
