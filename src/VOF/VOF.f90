@@ -148,13 +148,13 @@ contains
 		call readParameter(pfile,this%mug_,'mug')
 		call readParameter(pfile,this%sigma_,'sigma')
 		
+		!allocate vertex field
+    	call allocateArray(s_cv,0,nx,0,ny,0,nz)
+		
 		if (flow_solver==TWO_PHASE_FLOW) then
 		
 			!init boxes
 			call vofBlocksCTOR(mesh,gmesh,rt)
-		
-    		!allocate vertex field
-    		call allocateArray(s_cv,0,nx,0,ny,0,nz)
 
 			call updateStateBlocks(this)
 			
