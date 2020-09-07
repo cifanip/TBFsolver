@@ -21,6 +21,8 @@ module vofMOD
 	use vofBlocksMod
 	use timeMod
 	
+	implicit none
+	
 	integer, parameter :: s_Xsweep = 1
 	integer, parameter :: s_Ysweep = 2
 	integer, parameter :: s_Zsweep = 3
@@ -65,7 +67,6 @@ module vofMOD
 	private :: cnh
 	private :: cnp
 	private :: cn0
-	private :: storeOldVOField
 	private :: compute_total_vf
 	private :: compute_blk_vf
 	private :: check_mass_loss
@@ -232,7 +233,7 @@ contains
         type(VOF), intent(in) :: this
         type(field), intent(in) :: c
         type(field), intent(inout) :: cs
-        integer :: smooth_level
+        integer :: i,smooth_level
         
         smooth_level=1
         
@@ -1130,7 +1131,7 @@ contains
     subroutine resetSatellites(vofb)
     	type(vofBlock), intent(inout) :: vofb
     	integer, allocatable, dimension(:,:,:) :: lab
-        integer :: i,j,k,is,ie,js,je,ks,ke,lav,count_1,count_2
+        integer :: i,j,k,is,ie,js,je,ks,ke,lev,count_1,count_2
 
         !check re-set counter
         if (s_reset_vf_counter <= 9) then
@@ -1398,10 +1399,11 @@ contains
     subroutine computeNormal_hf(this,vofb)
     	type(VOF), intent(in) :: this
         type(vofBlock), intent(inout) :: vofb
-        integer :: i, j, k,cn,w
+        integer :: i, j, k, q, cn,w
         integer :: lbi, ubi, lbj, ubj, lbk, ubk
-        real(DP) :: mx, my, mz
-        real(DP) :: mmax
+        integer :: mloc_1,mloc_2,mloc_3
+        real(DP) :: mx, my, mz, m_1, m_2, m_3
+        real(DP) :: mmax,small
         integer, dimension(3) :: mloc
         integer, dimension(4) :: seq,lb_seq
         real(DP), dimension(4) :: h_seq
