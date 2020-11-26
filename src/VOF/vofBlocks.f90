@@ -60,6 +60,7 @@ module vofBlocksMod
 	type, public :: vofBlock
 		integer :: master, bn
 		integer, dimension(6) :: idx
+		real(DP) :: V0
 		real(DP), pointer, dimension(:) :: xc => NULL()
 		real(DP), pointer, dimension(:) :: yc => NULL()
 		real(DP), pointer, dimension(:) :: zc => NULL()
@@ -101,6 +102,7 @@ module vofBlocksMod
 	public :: updateBlock
 	public :: reInitBlockDistribution
 	public :: deallocateBlocks
+	public :: compute_blk_vf
 	
 	private :: build_VOF_blocks
 	private :: initVOFblocks
@@ -291,6 +293,7 @@ contains
     	logical :: present
     	!dummies for initBlock routine
 		real(DP), allocatable, dimension(:,:,:) :: dummy_rdp
+		real(DP) :: dummy_V0
     	
     	mpiCTRL => mesh%ptrMPIC_
     	
@@ -355,7 +358,7 @@ contains
     			R=s_pos_init(4,bi)
 				
 				call initBlock(mesh,gmesh,vofBlocks(nb_tmp),bi,mpiCTRL%rank_,is,ie,js,je,ks,ke,&
-    					       TIME_LEVEL_0_BLK,dummy_rdp,dummy_rdp,x0,y0,z0,R,nref)
+    					       TIME_LEVEL_0_BLK,dummy_rdp,dummy_rdp,dummy_V0,x0,y0,z0,R,nref)
     					       
     		end if
     	end do
@@ -389,17 +392,17 @@ contains
 !========================================================================================!
     subroutine initBlock(mesh,gmesh,vofb,bubble_id,box_master,is,ie,js,je,ks,ke,&
     					 INIT_TYPE,tmp_c,tmp_c0,&
-    					 x0_opt,y0_opt,z0_opt,R_opt,nref_opt)
+    					 V0_opt,x0_opt,y0_opt,z0_opt,R_opt,nref_opt)
    		type(grid), intent(in) :: mesh,gmesh
     	type(vofBlock), intent(inout) :: vofb
     	integer, intent(in) :: bubble_id,box_master
     	integer, intent(inout) :: is,ie,js,je,ks,ke
-    	real(DP), intent(in), optional :: x0_opt,y0_opt,z0_opt,R_opt
+    	real(DP), intent(in), optional :: V0_opt,x0_opt,y0_opt,z0_opt,R_opt
     	integer, intent(in), optional :: nref_opt
     	integer, intent(in) :: INIT_TYPE
     	real(DP), allocatable, dimension(:,:,:), intent(inout) :: tmp_c,tmp_c0
     	real(DP), allocatable, dimension(:,:,:) :: c_blk
-    	real(DP) :: x0,y0,z0,R
+    	real(DP) :: V0,x0,y0,z0,R
     	integer :: nxg,nyg,nzg,nref,lbi,lbj,lbk,ubi,ubj,ubk
 		
 		nxg = mesh%nxg_
@@ -412,7 +415,6 @@ contains
 			call reAllocateArray(tmp_c0,is-1,ie+1,js-1,je+1,ks-1,ke+1)
 			tmp_c = vofb%c(is-1:ie+1,js-1:je+1,ks-1:ke+1)
 			tmp_c0 = vofb%c0(is-1:ie+1,js-1:je+1,ks-1:ke+1)
-			
 			!reset periodic 
 			if ((is>nxg).OR.(ie<1)) then
 				is = modulo(is-1,nxg)+1
@@ -435,7 +437,7 @@ contains
 		vofb%idx(3)=js
 		vofb%idx(4)=je
 		vofb%idx(5)=ks
-		vofb%idx(6)=ke	
+		vofb%idx(6)=ke
 				
 		call allocate_blk_arrays(vofb)	
 		
@@ -462,6 +464,8 @@ contains
 			    call reAllocateArray(c_blk,is,ie,js,je,ks,ke)
     			call init_Bubble_vf(gmesh,c_blk,x0,y0,z0,R,nref)
 				vofb%c(is:ie,js:je,ks:ke)=c_blk
+				!init V0
+				call compute_blk_vf(vofb,vofb%V0)
 
 			case(UPDATE_BLK)
 				vofb%c(is-1:ie+1,js-1:je+1,ks-1:ke+1) = tmp_c
@@ -476,16 +480,49 @@ contains
 				ubk=ubound(tmp_c,3)
 				vofb%c(lbi:ubi,lbj:ubj,lbk:ubk) = tmp_c
 				vofb%c0(lbi:ubi,lbj:ubj,lbk:ubk) = tmp_c0
+				V0=V0_opt
+				vofb%V0=V0
 								
 			case(REINIT_BLK)
 				vofb%c = tmp_c
 				vofb%c0 = tmp_c0
+				!init V0
+				call compute_blk_vf(vofb,vofb%V0)
 
 			case default
 		end select
 
 
     end subroutine   	
+!========================================================================================!
+
+!========================================================================================!
+    subroutine compute_blk_vf(vofb,vf)
+    	type(vofBlock), intent(in) :: vofb
+    	real(DP), intent(out) :: vf
+    	integer :: i,j,k,is,ie,js,je,ks,ke
+    	real(DP) :: dx,dy,dz
+    	
+    	is=lbound(vofb%c,1)
+    	ie=ubound(vofb%c,1)
+    	js=lbound(vofb%c,2)
+    	je=ubound(vofb%c,2)
+    	ks=lbound(vofb%c,3)
+    	ke=ubound(vofb%c,3)
+    	
+    	vf=0.d0
+    	do i=is,ie
+    		do j=js,je
+    			do k=ks,ke
+    				dx=vofb%dxf(i)
+    				dy=vofb%dyf(j)
+    				dz=vofb%dzf(k)
+    				vf=vf+vofb%c(i,j,k)*dx*dy*dz
+    			end do
+    		end do
+    	end do
+    	
+    end subroutine
 !========================================================================================!
 
 !========================================================================================!
@@ -716,6 +753,8 @@ contains
 		lhs%master=rhs%master
 		lhs%bn=rhs%bn
 		lhs%idx=rhs%idx
+		
+		lhs%V0=rhs%V0
 		
 		call assignArray(lhs%idx_mx,rhs%idx_mx)
 		call assignArray(lhs%idx_my,rhs%idx_my)
@@ -2489,6 +2528,7 @@ contains
 		type(vofBlock), allocatable, dimension(:) :: new_blocks
 		type(mpiControl), pointer :: mpic
 		character(len=:), allocatable :: buff
+		real(DP) :: V0
     		
     		
 		mpic => mesh%ptrMPIC_
@@ -2562,10 +2602,10 @@ contains
     				!aggiungi element
     				if (isHere) then
     				    
-    				    !recv c,c0
+    				    !recv c,c0,V0
     				    call reAllocateArray(c_blk,is-1,ie+1,js-1,je+1,ks-1,ke+1)
     				    call reAllocateArray(c0_blk,is-1,ie+1,js-1,je+1,ks-1,ke+1)
-    				    sizeBuff=realDP_size*(size(c_blk)+size(c0_blk))
+    				    sizeBuff=realDP_size*(size(c_blk)+size(c0_blk)+1)
     				    call reAllocateArray(buff,sizeBuff)
     				    
     				    call MPI_Recv(buff,sizeBuff,MPI_CHARACTER,master,tag,&
@@ -2574,6 +2614,8 @@ contains
     				    call MPI_UNPACK(buff, sizeBuff, position, c_blk, size(c_blk), &
 								        MPI_DOUBLE_PRECISION, mpic%cartComm_, ierror)
     				    call MPI_UNPACK(buff, sizeBuff, position, c0_blk, size(c0_blk), &
+								        MPI_DOUBLE_PRECISION, mpic%cartComm_, ierror)
+    				    call MPI_UNPACK(buff, sizeBuff, position, V0, 1, &
 								        MPI_DOUBLE_PRECISION, mpic%cartComm_, ierror)			
     				
     					!add block element
@@ -2581,7 +2623,7 @@ contains
 					
 						!init new block
 						call initBlock(mesh,gmesh,new_blocks(nb),b,slave,is,ie,js,je,ks,ke,&
-									   REDISTRIBUTION_BLK,c_blk,c0_blk)
+									   REDISTRIBUTION_BLK,c_blk,c0_blk,V0)
 
     				end if      		    
     				
@@ -2603,22 +2645,25 @@ contains
     						      		    nxg,nyg,nzg,isHere)	
 
 					if (isHere) then
-    					!send c
+    					!send c,c0,V0
     					call reAllocateArray(c_blk,is-1,ie+1,js-1,je+1,ks-1,ke+1)
     					call reAllocateArray(c0_blk,is-1,ie+1,js-1,je+1,ks-1,ke+1)
     					do bl=1,s_nblk
     						if (vofBlocks(bl)%bn==b) then
 								c_blk=vofBlocks(bl)%c(is-1:ie+1,js-1:je+1,ks-1:ke+1)
 								c0_blk=vofBlocks(bl)%c0(is-1:ie+1,js-1:je+1,ks-1:ke+1)
+								V0=vofBlocks(bl)%V0
     						end if
     					end do    	
     					
-    					sizeBuff=realDP_size*(size(c_blk)+size(c0_blk))
+    					sizeBuff=realDP_size*(size(c_blk)+size(c0_blk)+1)
     					call reAllocateArray(buff,sizeBuff)
     					position = 0
     					call MPI_PACK(c_blk,size(c_blk), MPI_DOUBLE_PRECISION, buff, &
     								  sizeBuff, position, mpic%cartComm_, ierror)	
     					call MPI_PACK(c0_blk,size(c0_blk), MPI_DOUBLE_PRECISION, buff, &
+    								  sizeBuff, position, mpic%cartComm_, ierror)
+    					call MPI_PACK(V0,1, MPI_DOUBLE_PRECISION, buff, &
     								  sizeBuff, position, mpic%cartComm_, ierror) 		
 						call MPI_SEND(buff,sizeBuff,MPI_CHARACTER, slave, tag, &
 						              mpic%cartComm_, ierror)
