@@ -271,8 +271,8 @@ contains
         
         if (IS_MASTER) then
         	m_loss=abs(vf_total-s_vf0_total)/s_vf0_total
-        	!write(*,'(A,'//s_outputFormat(2:9)//')') '	|vf-vf0|/vf0: ', m_loss
-        	write(*,'(A,'//s_doubleFormat(2:10)//')') '	|vf-vf0|/vf0: ', m_loss        	
+        	write(*,'(A,'//s_outputFormat(2:9)//')') '	|vf-vf0|/vf0: ', m_loss
+        	!write(*,'(A,'//s_doubleFormat(2:10)//')') '	|vf-vf0|/vf0: ', m_loss        	
         end if
 
     end subroutine
