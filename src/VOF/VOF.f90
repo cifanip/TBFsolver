@@ -68,13 +68,13 @@ module vofMOD
 	private :: cnp
 	private :: cn0
 	private :: compute_total_vf
-	private :: compute_blk_vf
 	private :: check_mass_loss
 	private :: reconstruct
 	private :: search_full_interface_cells
 	private :: reconstruct_blocks
 	private :: implicitIntegratorAndUpdateCorrTerm
 	private :: explicitIntegrator
+	private :: explicitIntegrator_div_correction
 	private :: computeCorrFluxes
 	private :: computeGeoFluxes
 	private :: computeGeoMixedFluxes
@@ -88,6 +88,9 @@ module vofMOD
 	private :: info
 	private :: resetFragments
 	private :: resetSatellites
+	private :: offset_volume_difference
+	private :: check_wall_proximity
+	private :: build_div_velocity
 	private :: computeNormal_sharp
 	private :: computeNormal_smooth
 	private :: computeNormal_youngs
@@ -268,7 +271,8 @@ contains
         
         if (IS_MASTER) then
         	m_loss=abs(vf_total-s_vf0_total)/s_vf0_total
-        	write(*,'(A,'//s_outputFormat(2:9)//')') '	relative mass loss: ', m_loss
+        	!write(*,'(A,'//s_outputFormat(2:9)//')') '	|vf-vf0|/vf0: ', m_loss
+        	write(*,'(A,'//s_doubleFormat(2:10)//')') '	|vf-vf0|/vf0: ', m_loss        	
         end if
 
     end subroutine
@@ -290,35 +294,6 @@ contains
 		call Mpi_reduce(vf_tot, vf_totg, 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0,&
 		                this%mesh_%ptrMPIC_%cartComm_,ierror)
     
-    end subroutine
-!========================================================================================!
-
-!========================================================================================!
-    subroutine compute_blk_vf(vofb,vf)
-    	type(vofBlock), intent(in) :: vofb
-    	real(DP), intent(out) :: vf
-    	integer :: i,j,k,is,ie,js,je,ks,ke
-    	real(DP) :: dx,dy,dz
-    	
-    	is=vofb%idx(1)
-    	ie=vofb%idx(2)
-    	js=vofb%idx(3)
-    	je=vofb%idx(4)
-    	ks=vofb%idx(5)
-    	ke=vofb%idx(6)
-    	
-    	vf=0.d0
-    	do i=is,ie
-    		do j=js,je
-    			do k=ks,ke
-    				dx=vofb%dxf(i)
-    				dy=vofb%dyf(j)
-    				dz=vofb%dzf(k)
-    				vf=vf+vofb%c(i,j,k)*dx*dy*dz
-    			end do
-    		end do
-    	end do
-    	
     end subroutine
 !========================================================================================!
 
@@ -410,7 +385,13 @@ contains
 			end do
 		
 			call explicitIntegrator(this,vofBlocks(b))	
+			
 			call resetFragments(vofBlocks(b))
+			call resetSatellites(vofBlocks(b))
+			
+			!adjust for volume loss/gain
+			call offset_volume_difference(this,vofBlocks(b))
+			
 			call cn0(vofBlocks(b))
 			call updateBlock(this%mesh_,this%gmesh_,vofBlocks(b),b)
 			call updateState(this,vofBlocks(b))
@@ -444,6 +425,178 @@ contains
 		call info(this,finish-start,0)
     	
      end subroutine   	
+!========================================================================================!
+
+!========================================================================================!
+    subroutine offset_volume_difference(this,vofb)
+    	type(VOF), intent(in) :: this
+    	type(vofBlock), intent(inout) :: vofb
+    	real(DP), allocatable, dimension(:,:,:) :: cn
+    	real(DP) :: dt,V,V0,alpha,x0,y0,z0,c_x,c_y,c_z,cfl,cfl_max
+    	integer :: i,ub,lb,lbi,ubi,lbj,ubj,lbk,ubk
+    	logical :: is_at_wall
+    	
+    	dt=this%ptrTime_%dt_*alphaRKS(this%ptrTime_)
+    	
+    	call compute_blk_vf(vofb,V)
+    	alpha=-((V-vofb%V0)/dt)/V
+    	
+    	!compute block center
+    	!x0
+    	ub=ubound(vofb%xc,1)
+    	lb=lbound(vofb%xc,1)
+    	x0=0.5d0*(vofb%xc(ub)+vofb%xc(lb))
+    	!y0
+    	ub=ubound(vofb%yc,1)
+    	lb=lbound(vofb%yc,1)
+    	y0=0.5d0*(vofb%yc(ub)+vofb%yc(lb))
+    	!z0
+    	ub=ubound(vofb%zc,1)
+    	lb=lbound(vofb%zc,1)
+    	z0=0.5d0*(vofb%zc(ub)+vofb%zc(lb))
+    	
+        !check if the bubble is at the wall
+        call check_wall_proximity(this,vofb,is_at_wall)
+    	
+    	call build_div_velocity(vofb,alpha,dt,x0,y0,z0,is_at_wall)
+    	
+    	!store current vf field
+		lbi = lbound(vofb%c,1)
+		ubi = ubound(vofb%c,1)
+		lbj = lbound(vofb%c,2)
+		ubj = ubound(vofb%c,2)
+		lbk = lbound(vofb%c,3)
+		ubk = ubound(vofb%c,3)
+		call allocateArray(cn,lbi,ubi,lbj,ubj,lbk,ubk)
+		cn=vofb%c 	
+			
+		do i=1,3
+		
+			call reconstruct(this,vofb)
+			call computeGeoFluxes(this,vofb,s_sweep(i))
+			call computeCorrFluxes(this,vofb,s_sweep(i))
+			call explicitIntegrator_div_correction(this,vofb,cn)
+
+		end do
+
+    end subroutine   	
+!========================================================================================!
+
+!========================================================================================!
+    subroutine check_wall_proximity(this,vofb,is_at_wall)
+        type(VOF), intent(in) :: this
+        type(vofBlock), intent(inout) :: vofb
+        logical, intent(out) :: is_at_wall
+        integer :: nyg,lbj,ubj
+        logical :: wrap_y
+
+        wrap_y = this%mesh_%ptrMPIC_%wrapAround_(2)
+        
+        !fully periodic box
+        if (wrap_y) then
+            is_at_wall=.FALSE.
+            return
+        end if
+
+        nyg=this%mesh_%nyg_
+        
+		lbj = lbound(vofb%c,2)
+		ubj = ubound(vofb%c,2)
+		
+        if ((lbj<1).OR.(ubj>nyg)) then
+            is_at_wall=.TRUE.
+        else
+            is_at_wall=.FALSE.
+        end if        
+        
+    end subroutine   	
+!========================================================================================!
+
+!========================================================================================!
+    subroutine build_div_velocity(vofb,alpha,dt,x0,y0,z0,is_at_wall)
+        type(vofBlock), intent(inout) :: vofb
+        real(DP), intent(inout) :: alpha
+        real(DP), intent(in) :: dt,x0,y0,z0
+        logical, intent(in) :: is_at_wall
+        real(DP) :: q,c_x,c_y,c_z,cfl_max,cfl
+    	integer :: i, j, k
+    	integer :: ub,lbi,ubi,lbj,ubj,lbk,ubk
+    	
+        !check cfl max
+        ub=ubound(vofb%xf,1)
+        c_x=dt*abs((vofb%xf(ub)-x0)/minval(vofb%dxf,1))
+        ub=ubound(vofb%yf,1)
+        c_y=dt*abs((vofb%yf(ub)-y0)/minval(vofb%dyf,1))
+        ub=ubound(vofb%zf,1)
+        c_z=dt*abs((vofb%zf(ub)-z0)/minval(vofb%dzf,1))
+        
+        cfl_max=0.5d0
+        
+        if (is_at_wall) then
+            cfl = (alpha/2.d0)*(c_x+c_z)
+            if (cfl>cfl_max) then
+                alpha=2.d0*cfl_max/(c_x+c_z)
+            end if
+            q=alpha/2.d0
+        else
+            cfl = (alpha/3.d0)*(c_x+c_y+c_z)
+            if (cfl>cfl_max) then
+                alpha=3.d0*cfl_max/(c_x+c_y+c_z)  
+            end if
+            q=alpha/3.d0
+        end if
+        
+        !ux
+		lbi = lbound(vofb%ux,1)
+		ubi = ubound(vofb%ux,1)
+		lbj = lbound(vofb%ux,2)
+		ubj = ubound(vofb%ux,2)
+		lbk = lbound(vofb%ux,3)
+		ubk = ubound(vofb%ux,3)
+    	do k=lbk,ubk
+    		do j=lbj,ubj
+    			do i=lbi,ubi
+    			    vofb%ux(i,j,k)=q*(vofb%xf(i)-x0)
+    			end do
+    		end do
+    	end do	
+        
+        !uy
+        if (is_at_wall) then
+           vofb%uy=0.d0 
+        else
+		    lbi = lbound(vofb%uy,1)
+		    ubi = ubound(vofb%uy,1)
+		    lbj = lbound(vofb%uy,2)
+		    ubj = ubound(vofb%uy,2)
+		    lbk = lbound(vofb%uy,3)
+		    ubk = ubound(vofb%uy,3)
+    	    do k=lbk,ubk
+    		    do j=lbj,ubj
+    			    do i=lbi,ubi
+    			        vofb%uy(i,j,k)=q*(vofb%yf(j)-y0)
+    			    end do
+    		    end do
+    	    end do	
+    	end if
+
+        !uz
+		lbi = lbound(vofb%uz,1)
+		ubi = ubound(vofb%uz,1)
+		lbj = lbound(vofb%uz,2)
+		ubj = ubound(vofb%uz,2)
+		lbk = lbound(vofb%uz,3)
+		ubk = ubound(vofb%uz,3)
+    	do k=lbk,ubk
+    		do j=lbj,ubj
+    			do i=lbi,ubi
+    			    vofb%uz(i,j,k)=q*(vofb%zf(k)-z0)
+    			end do
+    		end do
+    	end do	
+		  
+        
+    end subroutine   	
 !========================================================================================!
 
 !========================================================================================!
@@ -574,6 +727,30 @@ contains
 !========================================================================================!
 
 !========================================================================================!
+    subroutine explicitIntegrator_div_correction(this,vofb,cn)
+    	type(VOF), intent(in) :: this
+    	type(vofBlock), intent(inout) :: vofb
+    	real(DP), allocatable, dimension(:,:,:), intent(in) :: cn
+    	integer :: lbi,ubi,lbj,ubj,lbk,ubk
+    	
+		lbi = lbound(vofb%geoFlux,1)
+		ubi = ubound(vofb%geoFlux,1)
+		lbj = lbound(vofb%geoFlux,2)
+		ubj = ubound(vofb%geoFlux,2)
+		lbk = lbound(vofb%geoFlux,3)
+		ubk = ubound(vofb%geoFlux,3)
+		
+    	vofb%c(lbi:ubi,lbj:ubj,lbk:ubk) = vofb%c(lbi:ubi,lbj:ubj,lbk:ubk) + vofb%geoFlux &
+    	                                  +	cn(lbi:ubi,lbj:ubj,lbk:ubk)*vofb%corrFlux
+
+    	call cut_off_vf(vofb)
+    	call updateState(this,vofb)
+    	call reSetFullEmpty(vofb)
+
+     end subroutine   	
+!========================================================================================!
+
+!========================================================================================!
     subroutine implicitIntegratorAndUpdateCorrTerm(this,vofb)
     	type(VOF), intent(in) :: this
     	type(vofBlock), intent(inout) :: vofb
@@ -615,7 +792,7 @@ contains
     	
     	vofb%c(lbi:ubi,lbj:ubj,lbk:ubk) = vofb%c(lbi:ubi,lbj:ubj,lbk:ubk) - vofb%corrTerm 
 	
-	vofb%corrTerm = 0.d0
+	    vofb%corrTerm = 0.d0
     	    	
     	call cut_off_vf(vofb)
     	call updateState(this,vofb)
