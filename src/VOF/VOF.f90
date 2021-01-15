@@ -389,8 +389,8 @@ contains
 			call resetFragments(vofBlocks(b))
 			call resetSatellites(vofBlocks(b))
 			
-			!adjust for volume loss/gain
-			call offset_volume_difference(this,vofBlocks(b))
+			!adjust for volume loss/gain - uncomment if needed
+			!call offset_volume_difference(this,vofBlocks(b))
 			
 			call cn0(vofBlocks(b))
 			call updateBlock(this%mesh_,this%gmesh_,vofBlocks(b),b)
