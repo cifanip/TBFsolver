@@ -530,6 +530,8 @@ contains
         real(DP) :: q,c_x,c_y,c_z,cfl,cfl_lim
     	integer :: i, j, k
     	integer :: ub,lbi,ubi,lbj,ubj,lbk,ubk
+	
+	is_failed=.FALSE.
     	
         !check cfl max
         ub=ubound(vofb%xf,1)
@@ -541,7 +543,7 @@ contains
         
         cfl_lim=0.45d0-cfl_max
         
-        if (cfl_lim<=0) then
+        if (cfl_lim<=0.d0) then
           is_failed=.TRUE.
           return
         end if
