@@ -350,7 +350,7 @@ contains
     	type(field), intent(inout) :: c
     	type(vfield), intent(in) :: u
     	integer :: i,b
-    	real(DP) :: start, finish
+    	real(DP) :: start, finish, cfl_max
 
     	start = MPI_Wtime()
     	
@@ -366,9 +366,11 @@ contains
 		!output Lagrangian quantities bubbles
 		!call bubblesLagrQ(this%ptrTime_%t_)
 		
+		!keep copy of max{CFL}
+		cfl_max = computeCFLmax(u,this%ptrTime_%dt_)
 
 		!$OMP PARALLEL DO DEFAULT(none) &
-		!$OMP SHARED(vofBlocks,this,s_nblk,s_sweep) &
+		!$OMP SHARED(vofBlocks,this,s_nblk,s_sweep,cfl_max) &
 		!$OMP PRIVATE(i,b)
 		do b=1,s_nblk
 		
@@ -388,9 +390,9 @@ contains
 			
 			call resetFragments(vofBlocks(b))
 			call resetSatellites(vofBlocks(b))
-			
+
 			!adjust for volume loss/gain - uncomment if needed
-			!call offset_volume_difference(this,vofBlocks(b))
+			!call offset_volume_difference(this,vofBlocks(b),cfl_max)
 			
 			call cn0(vofBlocks(b))
 			call updateBlock(this%mesh_,this%gmesh_,vofBlocks(b),b)
@@ -428,18 +430,20 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-    subroutine offset_volume_difference(this,vofb)
+    subroutine offset_volume_difference(this,vofb,cfl_max)
     	type(VOF), intent(in) :: this
     	type(vofBlock), intent(inout) :: vofb
+    	real(DP), intent(in) :: cfl_max
     	real(DP), allocatable, dimension(:,:,:) :: cn
-    	real(DP) :: dt,V,V0,alpha,x0,y0,z0,c_x,c_y,c_z,cfl,cfl_max
+    	real(DP) :: dt,dt_RK,V,alpha,x0,y0,z0
     	integer :: i,ub,lb,lbi,ubi,lbj,ubj,lbk,ubk
-    	logical :: is_at_wall
+    	logical :: is_at_wall,is_failed
     	
-    	dt=this%ptrTime_%dt_*alphaRKS(this%ptrTime_)
+    	dt=this%ptrTime_%dt_
+    	dt_RK=this%ptrTime_%dt_*alphaRKS(this%ptrTime_)
     	
     	call compute_blk_vf(vofb,V)
-    	alpha=-((V-vofb%V0)/dt)/V
+    	alpha=-((V-vofb%V0)/dt_RK)/V
     	
     	!compute block center
     	!x0
@@ -458,7 +462,11 @@ contains
         !check if the bubble is at the wall
         call check_wall_proximity(this,vofb,is_at_wall)
     	
-    	call build_div_velocity(vofb,alpha,dt,x0,y0,z0,is_at_wall)
+    	call build_div_velocity(vofb,alpha,dt,x0,y0,z0,cfl_max,is_at_wall,is_failed)
+    	
+    	if (is_failed) then
+    	  return
+    	end if
     	
     	!store current vf field
 		lbi = lbound(vofb%c,1)
@@ -468,7 +476,7 @@ contains
 		lbk = lbound(vofb%c,3)
 		ubk = ubound(vofb%c,3)
 		call allocateArray(cn,lbi,ubi,lbj,ubj,lbk,ubk)
-		cn=vofb%c 	
+		cn=vofb%c
 			
 		do i=1,3
 		
@@ -513,12 +521,13 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-    subroutine build_div_velocity(vofb,alpha,dt,x0,y0,z0,is_at_wall)
+    subroutine build_div_velocity(vofb,alpha,dt,x0,y0,z0,cfl_max,is_at_wall,is_failed)
         type(vofBlock), intent(inout) :: vofb
         real(DP), intent(inout) :: alpha
-        real(DP), intent(in) :: dt,x0,y0,z0
+        real(DP), intent(in) :: dt,x0,y0,z0,cfl_max
         logical, intent(in) :: is_at_wall
-        real(DP) :: q,c_x,c_y,c_z,cfl_max,cfl
+        logical, intent(out) :: is_failed
+        real(DP) :: q,c_x,c_y,c_z,cfl,cfl_lim
     	integer :: i, j, k
     	integer :: ub,lbi,ubi,lbj,ubj,lbk,ubk
     	
@@ -530,18 +539,23 @@ contains
         ub=ubound(vofb%zf,1)
         c_z=dt*abs((vofb%zf(ub)-z0)/minval(vofb%dzf,1))
         
-        cfl_max=0.5d0
+        cfl_lim=0.45d0-cfl_max
+        
+        if (cfl_lim<=0) then
+          is_failed=.TRUE.
+          return
+        end if
         
         if (is_at_wall) then
             cfl = (alpha/2.d0)*(c_x+c_z)
-            if (cfl>cfl_max) then
-                alpha=2.d0*cfl_max/(c_x+c_z)
+            if (cfl>cfl_lim) then
+                alpha=2.d0*cfl_lim/(c_x+c_z)
             end if
             q=alpha/2.d0
         else
             cfl = (alpha/3.d0)*(c_x+c_y+c_z)
-            if (cfl>cfl_max) then
-                alpha=3.d0*cfl_max/(c_x+c_y+c_z)  
+            if (cfl>cfl_lim) then
+                alpha=3.d0*cfl_lim/(c_x+c_y+c_z)  
             end if
             q=alpha/3.d0
         end if
@@ -1264,12 +1278,12 @@ contains
         	return
         end if
 		
-		is=vofb%idx(1)
-		ie=vofb%idx(2)
-		js=vofb%idx(3)
-		je=vofb%idx(4)
-		ks=vofb%idx(5)
-		ke=vofb%idx(6)		
+		is=vofb%idx(1)-1
+		ie=vofb%idx(2)+1
+		js=vofb%idx(3)-1
+		je=vofb%idx(4)+1
+		ks=vofb%idx(5)-1
+		ke=vofb%idx(6)+1	
     	
 		do k=ks,ke
 			do j=js,je
@@ -1315,12 +1329,12 @@ contains
         	return
         end if
         
-		is=vofb%idx(1)
-		ie=vofb%idx(2)
-		js=vofb%idx(3)
-		je=vofb%idx(4)
-		ks=vofb%idx(5)
-		ke=vofb%idx(6)
+		is=vofb%idx(1)-1
+		ie=vofb%idx(2)+1
+		js=vofb%idx(3)-1
+		je=vofb%idx(4)+1
+		ks=vofb%idx(5)-1
+		ke=vofb%idx(6)+1
 		
 		call reAllocateArray(lab,is-2,ie+2,js-2,je+2,ks-2,ke+2)
 		
