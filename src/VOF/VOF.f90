@@ -530,8 +530,8 @@ contains
         real(DP) :: q,c_x,c_y,c_z,cfl,cfl_lim
     	integer :: i, j, k
     	integer :: ub,lbi,ubi,lbj,ubj,lbk,ubk
-	
-	is_failed=.FALSE.
+    	
+    	is_failed=.FALSE.
     	
         !check cfl max
         ub=ubound(vofb%xf,1)
