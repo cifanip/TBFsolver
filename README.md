@@ -13,7 +13,7 @@ See file 'INSTALL' for instructions.
 TBFsolver is being continuously updated in order to fix possible bugs and add new features. Please, make sure you have downloaded the latest version of the code. An example of a test-case of a minimum turbulent channel flow, loaded with 18 deformable bubbles, is given in folder 'case_18'. Please refer to the [user guide](user_guide/user_guide.pdf) for an overview of the input parameters. 
 
 ## FORUM
-If you would like to get support from the developer as well as from other users, or simply ask general questions and share ideas related to TBFsolver, please join the web forum. You can do so by sending an email to p.cifani@utwente.nl, after which you will receive an invitation to join the group.
+If you would like to get support from the developer as well as from other users, or simply ask general questions and share ideas related to TBFsolver, please join the web forum. You can do so by sending an email to cifani.pl@gmail.com, after which you will receive an invitation to join the group.
 
 ### AWARD
 Wim Nieuwpoort Award 2107: Best numerical code in the Netherlands for serious applications on a significant part of a large High Performance Computing system.
